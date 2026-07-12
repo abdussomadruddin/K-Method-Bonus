@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 
 type Role = "admin" | "student";
 type Video = { id: string; title: string; filename: string; contentType: string; size: number; createdAt: string };
@@ -12,6 +13,45 @@ function formatSize(bytes: number) {
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("ms-MY", { day: "numeric", month: "short", year: "numeric" }).format(new Date(value));
+}
+
+function VideoThumbnail({ video, index, onOpen }: { video: Video; index: number; onOpen: (video: Video) => void }) {
+  const [frame, setFrame] = useState<string | null>(null);
+  const sourceRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const source = sourceRef.current;
+    if (!source) return;
+    let active = true;
+    const capture = () => {
+      if (!active || !source.videoWidth || !source.videoHeight) return;
+      const canvas = document.createElement("canvas");
+      canvas.width = source.videoWidth;
+      canvas.height = source.videoHeight;
+      canvas.getContext("2d")?.drawImage(source, 0, 0, canvas.width, canvas.height);
+      try { setFrame(canvas.toDataURL("image/jpeg", 0.82)); } catch { /* Retain the fallback artwork. */ }
+    };
+    const seekToFirstFrame = () => {
+      if (Number.isFinite(source.duration) && source.duration > 0.01) source.currentTime = 0.01;
+      else capture();
+    };
+    source.addEventListener("loadedmetadata", seekToFirstFrame);
+    source.addEventListener("seeked", capture);
+    if (source.readyState >= 1) seekToFirstFrame();
+    return () => {
+      active = false;
+      source.removeEventListener("loadedmetadata", seekToFirstFrame);
+      source.removeEventListener("seeked", capture);
+    };
+  }, [video.id]);
+
+  return <>
+    <button className="thumbnail" onClick={() => onOpen(video)} aria-label={`Mainkan ${video.title}`}>
+      {frame && <img src={frame} alt="" />}
+      <span className="number">{String(index + 1).padStart(2, "0")}</span><span className="play">▶</span><span className="duration">VIDEO</span>
+    </button>
+    <video ref={sourceRef} className="thumbnail-source" src={`/api/videos/${video.id}/stream`} muted playsInline preload="metadata" aria-hidden="true" tabIndex={-1} />
+  </>;
 }
 
 export default function Home() {
@@ -92,8 +132,13 @@ function Dashboard({ role, videos, allVideos, search, setSearch, selected, setSe
   const videoRef = useRef<HTMLVideoElement>(null);
 
   function openVideo(video: Video) {
-    if (role === "student") void document.documentElement.requestFullscreen?.().catch(() => {});
-    setSelected(video);
+    if (role !== "student") { setSelected(video); return; }
+    flushSync(() => setSelected(video));
+    const player = videoRef.current as (HTMLVideoElement & { webkitEnterFullscreen?: () => void }) | null;
+    if (!player) return;
+    if (typeof player.webkitEnterFullscreen === "function") player.webkitEnterFullscreen();
+    else void player.requestFullscreen?.().catch(() => document.documentElement.requestFullscreen?.().catch(() => {}));
+    void player.play().catch(() => {});
   }
 
   function closeVideo() {
@@ -156,7 +201,7 @@ function Dashboard({ role, videos, allVideos, search, setSearch, selected, setSe
         {notice && <div className="notice" role="status">{notice}<button onClick={() => setNotice("")}>×</button></div>}
         {videos.length === 0 ? <section className="empty"><div>▷</div><h2>{search ? "Tiada video ditemui" : "Belum ada video"}</h2><p>{search ? "Cuba kata carian yang lain." : role === "admin" ? "Muat naik video pertama untuk mula membina perpustakaan." : "Kandungan pembelajaran akan muncul di sini."}</p></section> :
           <section className="video-grid">{videos.map((video, index) => <article className="video-card" key={video.id}>
-            <button className="thumbnail" onClick={() => openVideo(video)} aria-label={`Mainkan ${video.title}`}><span className="number">{String(index + 1).padStart(2, "0")}</span><span className="play">▶</span><span className="duration">VIDEO</span></button>
+            <VideoThumbnail video={video} index={index} onOpen={openVideo} />
             <div className="card-body"><h2>{video.title}</h2><p>{formatDate(video.createdAt)} · {formatSize(video.size)}</p>{role === "admin" && <div className="card-actions"><button onClick={() => edit(video)}>Ubah tajuk</button><button className="danger" disabled={working === video.id} onClick={() => remove(video)}>Padam</button></div>}</div>
           </article>)}</section>}
       </section>

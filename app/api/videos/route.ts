@@ -1,35 +1,31 @@
+import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { readSession } from "@/lib/auth";
-import { driveFile, listDriveVideos, saveDriveVideo } from "@/lib/google-drive";
-
-const TYPES = new Set(["video/mp4", "video/webm", "video/quicktime"]);
-
-function titleFromFilename(filename: string) {
-  return filename.replace(/\.(mp4|webm|mov)$/i, "").trim() || filename;
-}
+import { ensureSchema, sql } from "@/lib/runtime";
+import { youtubeVideoId } from "@/lib/youtube";
 
 export async function GET() {
   if (!await readSession()) return NextResponse.json({ error: "Log masuk diperlukan." }, { status: 401 });
-  const files = await listDriveVideos();
-  const videos = files.filter((file) => TYPES.has(file.mimeType)).map((file) => ({
-    id: file.id,
-    title: file.appProperties?.lmsTitle || titleFromFilename(file.name),
-    filename: file.name,
-    contentType: file.mimeType,
-    size: Number(file.size),
-    createdAt: file.createdTime,
-  }));
+  await ensureSchema();
+  const rows = await sql()`SELECT id, title, youtube_id, created_at FROM youtube_videos ORDER BY created_at DESC`;
+  const videos = rows.map((row) => ({ id: row.id, title: row.title, youtubeId: row.youtube_id, createdAt: row.created_at }));
   return NextResponse.json({ videos });
 }
 
 export async function POST(request: NextRequest) {
   if (await readSession() !== "admin") return NextResponse.json({ error: "Akses admin diperlukan." }, { status: 403 });
-  const { title: rawTitle, driveFileId } = await request.json() as { title?: string; driveFileId?: string };
+  const { title: rawTitle, youtubeUrl } = await request.json() as { title?: string; youtubeUrl?: string };
   const title = String(rawTitle || "").trim();
   if (!title || title.length > 150) return NextResponse.json({ error: "Tajuk mesti antara 1 hingga 150 aksara." }, { status: 400 });
-  if (!driveFileId) return NextResponse.json({ error: "Muat naik video belum selesai." }, { status: 400 });
-  const file = await driveFile(driveFileId);
-  if (!TYPES.has(file.mimeType)) return NextResponse.json({ error: "Gunakan fail MP4, WebM atau MOV." }, { status: 400 });
-  const saved = await saveDriveVideo(file.id, title);
-  return NextResponse.json({ id: saved.id, title }, { status: 201 });
+  const videoId = youtubeVideoId(String(youtubeUrl || ""));
+  if (!videoId) return NextResponse.json({ error: "Masukkan pautan YouTube yang sah." }, { status: 400 });
+  await ensureSchema();
+  try {
+    const rows = await sql()`INSERT INTO youtube_videos (id, title, youtube_id) VALUES (${randomUUID()}, ${title}, ${videoId}) RETURNING id, title, youtube_id, created_at`;
+    const video = rows[0];
+    return NextResponse.json({ video: { id: video.id, title: video.title, youtubeId: video.youtube_id, createdAt: video.created_at } }, { status: 201 });
+  } catch (error) {
+    if ((error as { code?: string }).code === "23505") return NextResponse.json({ error: "Video YouTube ini sudah ditambah." }, { status: 409 });
+    throw error;
+  }
 }

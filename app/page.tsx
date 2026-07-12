@@ -1,100 +1,13 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { youtubeEmbedUrl } from "@/lib/youtube";
 
 type Role = "admin" | "student";
-type Video = { id: string; title: string; filename: string; contentType: string; size: number; createdAt: string };
-
-function formatSize(bytes: number) {
-  if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
+type Video = { id: string; title: string; youtubeId: string; createdAt: string };
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("ms-MY", { day: "numeric", month: "short", year: "numeric" }).format(new Date(value));
-}
-
-async function thumbnailFromUpload(file: File) {
-  return new Promise<string | undefined>((resolve) => {
-    const url = URL.createObjectURL(file);
-    const video = document.createElement("video");
-    const finish = (value?: string) => { URL.revokeObjectURL(url); resolve(value); };
-    video.muted = true; video.preload = "metadata"; video.src = url;
-    video.onloadedmetadata = () => { video.currentTime = video.duration > 0.01 ? 0.01 : 0; };
-    video.onseeked = () => {
-      const ratio = Math.min(1, 640 / video.videoWidth, 360 / video.videoHeight);
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.max(1, Math.round(video.videoWidth * ratio)); canvas.height = Math.max(1, Math.round(video.videoHeight * ratio));
-      canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
-      try { finish(canvas.toDataURL("image/jpeg", 0.78).split(",")[1]); } catch { finish(); }
-    };
-    video.onerror = () => finish();
-  });
-}
-
-function VideoThumbnail({ video, index, onOpen }: { video: Video; index: number; onOpen: (video: Video) => void }) {
-  const [useFrameFallback, setUseFrameFallback] = useState(false);
-  const [frame, setFrame] = useState<string | null>(null);
-  const sourceRef = useRef<HTMLVideoElement>(null);
-
-  useEffect(() => {
-    if (!useFrameFallback) return;
-    const source = sourceRef.current;
-    if (!source) return;
-    let active = true;
-    const capture = () => {
-      if (!active || !source.videoWidth || !source.videoHeight) return;
-      const canvas = document.createElement("canvas");
-      canvas.width = source.videoWidth;
-      canvas.height = source.videoHeight;
-      canvas.getContext("2d")?.drawImage(source, 0, 0, canvas.width, canvas.height);
-      try { setFrame(canvas.toDataURL("image/jpeg", 0.8)); } catch { /* Keep the fallback artwork. */ }
-    };
-    const seekToFirstFrame = () => {
-      if (Number.isFinite(source.duration) && source.duration > 0.01) source.currentTime = 0.01;
-      else capture();
-    };
-    source.addEventListener("loadedmetadata", seekToFirstFrame);
-    source.addEventListener("seeked", capture);
-    if (source.readyState >= 1) seekToFirstFrame();
-    return () => {
-      active = false;
-      source.removeEventListener("loadedmetadata", seekToFirstFrame);
-      source.removeEventListener("seeked", capture);
-    };
-  }, [useFrameFallback, video.id]);
-
-  return <button className="thumbnail" onClick={() => onOpen(video)} aria-label={`Mainkan ${video.title}`}>
-    {!useFrameFallback && <img src={`/api/videos/${video.id}/thumbnail`} alt="" onError={() => setUseFrameFallback(true)} />}
-    {frame && <img src={frame} alt="" />}
-    {useFrameFallback && <video ref={sourceRef} className="thumbnail-source" src={`/api/videos/${video.id}/stream`} muted playsInline preload="metadata" aria-hidden="true" tabIndex={-1} />}
-    <span className="number">{String(index + 1).padStart(2, "0")}</span><span className="play">▶</span><span className="duration">VIDEO</span>
-  </button>;
-}
-
-function VideoPreloader({ videos, paused }: { videos: Video[]; paused: boolean }) {
-  useEffect(() => {
-    let preloaders: HTMLVideoElement[] = [];
-    if (paused) return;
-    // Let a video opened immediately after landing get the available bandwidth first.
-    const timer = window.setTimeout(() => {
-      preloaders = videos.map((video) => {
-        const source = document.createElement("video");
-        const seekToTenSeconds = () => { if (source.duration > 10) source.currentTime = 10; };
-        source.muted = true; source.playsInline = true; source.preload = "auto";
-        source.addEventListener("loadedmetadata", seekToTenSeconds, { once: true });
-        source.src = `/api/videos/${video.id}/stream`;
-        source.load();
-        return source;
-      });
-    }, 5000);
-    return () => {
-      window.clearTimeout(timer);
-      preloaders.forEach((source) => { source.pause(); source.removeAttribute("src"); source.load(); });
-    };
-  }, [paused, videos]); // The video list, not search results, controls background buffering.
-
-  return null;
 }
 
 export default function Home() {
@@ -171,50 +84,21 @@ function Dashboard({ role, videos, allVideos, search, setSearch, selected, setSe
   const [uploadOpen, setUploadOpen] = useState(false);
   const [working, setWorking] = useState("");
   const [notice, setNotice] = useState("");
-  const [playerLoading, setPlayerLoading] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  function openVideo(video: Video) {
-    setPlayerLoading(true);
-    setSelected(video);
-  }
-
-  function closeVideo() {
-    setPlayerLoading(false);
-    setSelected(null);
-    if (document.fullscreenElement) void document.exitFullscreen?.();
-  }
-
-  async function upload(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault(); setNotice(""); setWorking("upload");
+  async function addVideo(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault(); setNotice(""); setWorking("add");
     const body = new FormData(e.currentTarget);
-    const file = body.get("video");
-    if (!(file instanceof File)) { setWorking(""); return; }
-    const thumbnail = await thumbnailFromUpload(file);
-    const session = await fetch("/api/videos/upload", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ filename: file.name, contentType: file.type, size: file.size, thumbnail }) });
-    const sessionData = await session.json().catch(() => ({}));
-    if (!session.ok) { setNotice(sessionData.error || "Muat naik tidak dapat dimulakan."); setWorking(""); return; }
-    const chunkSize = 8 * 1024 * 1024;
-    let offset = 0; let driveFileId = "";
-    while (offset < file.size) {
-      const end = Math.min(offset + chunkSize, file.size);
-      const uploadResponse = await fetch(sessionData.uploadUrl, { method: "PUT", headers: { "Content-Type": file.type, "Content-Range": `bytes ${offset}-${end - 1}/${file.size}` }, body: file.slice(offset, end) });
-      if (uploadResponse.status !== 308 && !uploadResponse.ok) { setNotice("Muat naik ke Google Drive tidak berjaya."); setWorking(""); return; }
-      if (uploadResponse.ok) driveFileId = (await uploadResponse.json()).id;
-      offset = end;
-    }
-    const response = await fetch("/api/videos", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: body.get("title"), driveFileId }) });
+    const response = await fetch("/api/videos", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: body.get("title"), youtubeUrl: body.get("youtubeUrl") }) });
     const data = await response.json().catch(() => ({}));
-    if (response.ok) { setUploadOpen(false); setNotice("Video berjaya dimuat naik."); await reload(); }
-    else setNotice(data.error || "Muat naik tidak berjaya.");
+    if (response.ok) { setUploadOpen(false); setNotice("Video YouTube berjaya ditambah."); await reload(); }
+    else setNotice(data.error || "Video tidak dapat ditambah.");
     setWorking("");
   }
 
   async function edit(video: Video) {
     const title = window.prompt("Tajuk baharu", video.title)?.trim();
     if (!title || title === video.title) return;
-    const response = await fetch(`/api/videos/${video.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ title }) });
+    const youtubeUrl = window.prompt("Pautan YouTube baharu (biarkan kosong untuk kekalkan pautan sedia ada)", "")?.trim();
+    const response = await fetch(`/api/videos/${video.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ title, ...(youtubeUrl ? { youtubeUrl } : {}) }) });
     const data = await response.json().catch(() => ({}));
     setNotice(response.ok ? "Tajuk berjaya dikemas kini." : data.error || "Tajuk tidak dapat dikemas kini.");
     if (response.ok) await reload();
@@ -232,24 +116,26 @@ function Dashboard({ role, videos, allVideos, search, setSearch, selected, setSe
 
   return (
     <main className="app-shell">
-      <VideoPreloader videos={allVideos} paused={Boolean(selected)} />
       <header className="topbar">
         <div className="logo-row"><div className="brand-mark small">K</div><div><strong>Bonus K-Method</strong><span>Portal Pembelajaran</span></div></div>
         <div className="top-actions"><span className="role-badge">{role === "admin" ? "Admin" : "Student"}</span><button className="ghost" onClick={logout}>Log keluar ↗</button></div>
       </header>
       <section className="dashboard">
-        {role === "admin" && <div className="welcome-row"><div><p className="eyebrow">PANEL PENGURUSAN</p><h1>Urus kandungan anda</h1><p className="muted">Tambah dan kemas kini video pembelajaran di satu tempat.</p></div><button className="primary" onClick={() => setUploadOpen(true)}>＋ Muat naik video</button></div>}
+        <div className="welcome-row">
+          <div><p className="eyebrow">{role === "admin" ? "PANEL PENGURUSAN" : "PERPUSTAKAAN VIDEO"}</p><h1>{role === "admin" ? "Urus kandungan anda" : "Teruskan pembelajaran anda"}</h1><p className="muted">{role === "admin" ? "Tambah dan kemas kini video pembelajaran di satu tempat." : "Pilih video dan mula belajar mengikut masa anda."}</p></div>
+          {role === "admin" && <button className="primary" onClick={() => setUploadOpen(true)}>＋ Tambah video</button>}
+        </div>
         <div className="toolbar"><div className="search"><span>⌕</span><input aria-label="Cari video" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari tajuk video..." /></div><span className="count">{allVideos.length} video</span></div>
         {notice && <div className="notice" role="status">{notice}<button onClick={() => setNotice("")}>×</button></div>}
         {videos.length === 0 ? <section className="empty"><div>▷</div><h2>{search ? "Tiada video ditemui" : "Belum ada video"}</h2><p>{search ? "Cuba kata carian yang lain." : role === "admin" ? "Muat naik video pertama untuk mula membina perpustakaan." : "Kandungan pembelajaran akan muncul di sini."}</p></section> :
           <section className="video-grid">{videos.map((video, index) => <article className="video-card" key={video.id}>
-            <VideoThumbnail video={video} index={index} onOpen={openVideo} />
-            <div className="card-body"><h2>{video.title}</h2><p>{formatDate(video.createdAt)} · {formatSize(video.size)}</p>{role === "admin" && <div className="card-actions"><button onClick={() => edit(video)}>Ubah tajuk</button><button className="danger" disabled={working === video.id} onClick={() => remove(video)}>Padam</button></div>}</div>
+            <button className="thumbnail" onClick={() => setSelected(video)} aria-label={`Mainkan ${video.title}`}><span className="number">{String(index + 1).padStart(2, "0")}</span><span className="play">▶</span><span className="duration">VIDEO</span></button>
+            <div className="card-body"><h2>{video.title}</h2><p>{formatDate(video.createdAt)} · YouTube Unlisted</p>{role === "admin" && <div className="card-actions"><button onClick={() => edit(video)}>Ubah tajuk</button><button className="danger" disabled={working === video.id} onClick={() => remove(video)}>Padam</button></div>}</div>
           </article>)}</section>}
       </section>
-      {role === "admin" && <footer><span>© 2026 Bonus K-Method</span><span>Belajar • Praktik • Kuasai</span></footer>}
-      {selected && <div className="modal-backdrop" onMouseDown={closeVideo}><section className="player-modal" onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={selected.title}><button className="modal-close" onClick={closeVideo} aria-label="Tutup">×</button>{playerLoading && <div className="player-loading" role="status"><div className="loader" aria-label="Memuatkan video" /><span>Sila tunggu sebentar…</span></div>}<video ref={videoRef} src={`/api/videos/${selected.id}/stream`} controls autoPlay playsInline controlsList={role === "student" ? "nodownload" : undefined} onCanPlay={() => { if (role === "student") void videoRef.current?.play().catch(() => {}); }} onPlaying={() => setPlayerLoading(false)} onWaiting={() => setPlayerLoading(true)} onError={() => { setPlayerLoading(false); setNotice("Video tidak dapat dimuatkan."); }} /><div><p className="eyebrow">VIDEO PEMBELAJARAN</p><h2>{selected.title}</h2></div></section></div>}
-      {uploadOpen && <div className="modal-backdrop" onMouseDown={() => setUploadOpen(false)}><form className="upload-modal" onSubmit={upload} onMouseDown={(e) => e.stopPropagation()}><button type="button" className="modal-close" onClick={() => setUploadOpen(false)}>×</button><p className="eyebrow">KANDUNGAN BAHARU</p><h2>Muat naik video</h2><label htmlFor="title">Tajuk video</label><input id="title" name="title" maxLength={150} required placeholder="Contoh: Pengenalan K-Method" /><label htmlFor="video">Fail video</label><div className="file-drop" onClick={() => fileRef.current?.click()}>↑<strong>Pilih fail video</strong><span>MP4, WebM atau MOV · Fail besar disokong</span></div><input ref={fileRef} className="sr-only" id="video" name="video" type="file" accept="video/mp4,video/webm,video/quicktime" required /><button className="primary full" disabled={working === "upload"}>{working === "upload" ? "Sedang memuat naik..." : "Muat naik video"}</button></form></div>}
+      <footer><span>© 2026 Bonus K-Method</span><span>Belajar • Praktik • Kuasai</span></footer>
+      {selected && <div className="modal-backdrop" onMouseDown={() => setSelected(null)}><section className="player-modal" onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={selected.title}><button className="modal-close" onClick={() => setSelected(null)} aria-label="Tutup">×</button><iframe className="youtube-player" src={youtubeEmbedUrl(selected.youtubeId, window.location.origin)} title={selected.title} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen={false} referrerPolicy="strict-origin-when-cross-origin" /><div><p className="eyebrow">VIDEO PEMBELAJARAN</p><h2>{selected.title}</h2></div></section></div>}
+      {uploadOpen && <div className="modal-backdrop" onMouseDown={() => setUploadOpen(false)}><form className="upload-modal" onSubmit={addVideo} onMouseDown={(e) => e.stopPropagation()}><button type="button" className="modal-close" onClick={() => setUploadOpen(false)}>×</button><p className="eyebrow">KANDUNGAN BAHARU</p><h2>Tambah video YouTube</h2><p className="muted">Gunakan pautan video YouTube yang ditetapkan sebagai Unlisted.</p><label htmlFor="title">Tajuk video</label><input id="title" name="title" maxLength={150} required placeholder="Contoh: Pengenalan K-Method" /><label htmlFor="youtubeUrl">Pautan YouTube</label><input id="youtubeUrl" name="youtubeUrl" type="url" required placeholder="https://youtu.be/..." /><button className="primary full" disabled={working === "add"}>{working === "add" ? "Sedang menambah..." : "Tambah video"}</button></form></div>}
     </main>
   );
 }

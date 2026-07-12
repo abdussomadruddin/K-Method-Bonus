@@ -120,12 +120,12 @@ function Dashboard({ role, videos, allVideos, search, setSearch, selected, setSe
         <div className="logo-row"><div className="brand-mark small">K</div><div><strong>Bonus K-Method</strong><span>Portal Pembelajaran</span></div></div>
         <div className="top-actions"><span className="role-badge">{role === "admin" ? "Admin" : "Student"}</span><button className="ghost" onClick={logout}>Log keluar ↗</button></div>
       </header>
-      <section className="dashboard">
-        <div className="welcome-row">
+      <section className={`dashboard${role === "student" ? " video-library" : ""}`}>
+        {role === "admin" && <><div className="welcome-row">
           <div><p className="eyebrow">{role === "admin" ? "PANEL PENGURUSAN" : "PERPUSTAKAAN VIDEO"}</p><h1>{role === "admin" ? "Urus kandungan anda" : "Teruskan pembelajaran anda"}</h1><p className="muted">{role === "admin" ? "Tambah dan kemas kini video pembelajaran di satu tempat." : "Pilih video dan mula belajar mengikut masa anda."}</p></div>
           {role === "admin" && <button className="primary" onClick={() => setUploadOpen(true)}>＋ Tambah video</button>}
         </div>
-        <div className="toolbar"><div className="search"><span>⌕</span><input aria-label="Cari video" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari tajuk video..." /></div><span className="count">{allVideos.length} video</span></div>
+        <div className="toolbar"><div className="search"><span>⌕</span><input aria-label="Cari video" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari tajuk video..." /></div><span className="count">{allVideos.length} video</span></div></>}
         {notice && <div className="notice" role="status">{notice}<button onClick={() => setNotice("")}>×</button></div>}
         {videos.length === 0 ? <section className="empty"><div>▷</div><h2>{search ? "Tiada video ditemui" : "Belum ada video"}</h2><p>{search ? "Cuba kata carian yang lain." : role === "admin" ? "Muat naik video pertama untuk mula membina perpustakaan." : "Kandungan pembelajaran akan muncul di sini."}</p></section> :
           <section className="video-grid">{videos.map((video, index) => <article className="video-card" key={video.id}>
@@ -133,7 +133,7 @@ function Dashboard({ role, videos, allVideos, search, setSearch, selected, setSe
             <div className="card-body"><h2>{video.title}</h2><p>{formatDate(video.createdAt)} · YouTube Unlisted</p>{role === "admin" && <div className="card-actions"><button onClick={() => edit(video)}>Ubah tajuk</button><button className="danger" disabled={working === video.id} onClick={() => remove(video)}>Padam</button></div>}</div>
           </article>)}</section>}
       </section>
-      <footer><span>© 2026 Bonus K-Method</span><span>Belajar • Praktik • Kuasai</span></footer>
+      {role === "admin" && <footer><span>© 2026 Bonus K-Method</span><span>Belajar • Praktik • Kuasai</span></footer>}
       {selected && <div className="modal-backdrop" onMouseDown={() => setSelected(null)}><section className="player-modal" onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={selected.title}><button className="modal-close" onClick={() => setSelected(null)} aria-label="Tutup">×</button><iframe className="youtube-player" src={youtubeEmbedUrl(selected.youtubeId, window.location.origin)} title={selected.title} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen={false} referrerPolicy="strict-origin-when-cross-origin" /><div><p className="eyebrow">VIDEO PEMBELAJARAN</p><h2>{selected.title}</h2></div></section></div>}
       {uploadOpen && <div className="modal-backdrop" onMouseDown={() => setUploadOpen(false)}><form className="upload-modal" onSubmit={addVideo} onMouseDown={(e) => e.stopPropagation()}><button type="button" className="modal-close" onClick={() => setUploadOpen(false)}>×</button><p className="eyebrow">KANDUNGAN BAHARU</p><h2>Tambah video YouTube</h2><p className="muted">Gunakan pautan video YouTube yang ditetapkan sebagai Unlisted.</p><label htmlFor="title">Tajuk video</label><input id="title" name="title" maxLength={150} required placeholder="Contoh: Pengenalan K-Method" /><label htmlFor="youtubeUrl">Pautan YouTube</label><input id="youtubeUrl" name="youtubeUrl" type="url" required placeholder="https://youtu.be/..." /><button className="primary full" disabled={working === "add"}>{working === "add" ? "Sedang menambah..." : "Tambah video"}</button></form></div>}
     </main>

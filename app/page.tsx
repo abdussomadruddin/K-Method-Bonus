@@ -93,7 +93,21 @@ function Dashboard({ role, videos, allVideos, search, setSearch, selected, setSe
   async function upload(e: FormEvent<HTMLFormElement>) {
     e.preventDefault(); setNotice(""); setWorking("upload");
     const body = new FormData(e.currentTarget);
-    const response = await fetch("/api/videos", { method: "POST", body });
+    const file = body.get("video");
+    if (!(file instanceof File)) { setWorking(""); return; }
+    const session = await fetch("/api/videos/upload", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ filename: file.name, contentType: file.type, size: file.size }) });
+    const sessionData = await session.json().catch(() => ({}));
+    if (!session.ok) { setNotice(sessionData.error || "Muat naik tidak dapat dimulakan."); setWorking(""); return; }
+    const chunkSize = 8 * 1024 * 1024;
+    let offset = 0; let driveFileId = "";
+    while (offset < file.size) {
+      const end = Math.min(offset + chunkSize, file.size);
+      const uploadResponse = await fetch(sessionData.uploadUrl, { method: "PUT", headers: { "Content-Type": file.type, "Content-Range": `bytes ${offset}-${end - 1}/${file.size}` }, body: file.slice(offset, end) });
+      if (uploadResponse.status !== 308 && !uploadResponse.ok) { setNotice("Muat naik ke Google Drive tidak berjaya."); setWorking(""); return; }
+      if (uploadResponse.ok) driveFileId = (await uploadResponse.json()).id;
+      offset = end;
+    }
+    const response = await fetch("/api/videos", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: body.get("title"), driveFileId }) });
     const data = await response.json().catch(() => ({}));
     if (response.ok) { setUploadOpen(false); setNotice("Video berjaya dimuat naik."); await reload(); }
     else setNotice(data.error || "Muat naik tidak berjaya.");
@@ -140,7 +154,7 @@ function Dashboard({ role, videos, allVideos, search, setSearch, selected, setSe
       </section>
       <footer><span>© 2026 Bonus K-Method</span><span>Belajar • Praktik • Kuasai</span></footer>
       {selected && <div className="modal-backdrop" onMouseDown={() => setSelected(null)}><section className="player-modal" onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={selected.title}><button className="modal-close" onClick={() => setSelected(null)} aria-label="Tutup">×</button><video src={`/api/videos/${selected.id}/stream`} controls autoPlay playsInline controlsList={role === "student" ? "nodownload" : undefined} /><div><p className="eyebrow">VIDEO PEMBELAJARAN</p><h2>{selected.title}</h2></div></section></div>}
-      {uploadOpen && <div className="modal-backdrop" onMouseDown={() => setUploadOpen(false)}><form className="upload-modal" onSubmit={upload} onMouseDown={(e) => e.stopPropagation()}><button type="button" className="modal-close" onClick={() => setUploadOpen(false)}>×</button><p className="eyebrow">KANDUNGAN BAHARU</p><h2>Muat naik video</h2><label htmlFor="title">Tajuk video</label><input id="title" name="title" maxLength={150} required placeholder="Contoh: Pengenalan K-Method" /><label htmlFor="video">Fail video</label><div className="file-drop" onClick={() => fileRef.current?.click()}>↑<strong>Pilih fail video</strong><span>MP4, WebM atau MOV · Maksimum 500 MB</span></div><input ref={fileRef} className="sr-only" id="video" name="video" type="file" accept="video/mp4,video/webm,video/quicktime" required /><button className="primary full" disabled={working === "upload"}>{working === "upload" ? "Sedang memuat naik..." : "Muat naik video"}</button></form></div>}
+      {uploadOpen && <div className="modal-backdrop" onMouseDown={() => setUploadOpen(false)}><form className="upload-modal" onSubmit={upload} onMouseDown={(e) => e.stopPropagation()}><button type="button" className="modal-close" onClick={() => setUploadOpen(false)}>×</button><p className="eyebrow">KANDUNGAN BAHARU</p><h2>Muat naik video</h2><label htmlFor="title">Tajuk video</label><input id="title" name="title" maxLength={150} required placeholder="Contoh: Pengenalan K-Method" /><label htmlFor="video">Fail video</label><div className="file-drop" onClick={() => fileRef.current?.click()}>↑<strong>Pilih fail video</strong><span>MP4, WebM atau MOV · Fail besar disokong</span></div><input ref={fileRef} className="sr-only" id="video" name="video" type="file" accept="video/mp4,video/webm,video/quicktime" required /><button className="primary full" disabled={working === "upload"}>{working === "upload" ? "Sedang memuat naik..." : "Muat naik video"}</button></form></div>}
     </main>
   );
 }

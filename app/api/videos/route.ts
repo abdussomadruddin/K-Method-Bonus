@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { put, del } from "@vercel/blob";
 import { readSession } from "@/lib/auth";
 import { ensureSchema, sql } from "@/lib/runtime";
+import { driveFile } from "@/lib/google-drive";
 
 const TYPES = new Set(["video/mp4", "video/webm", "video/quicktime"]);
-const MAX = 500 * 1024 * 1024;
 
 export async function GET() {
   if (!await readSession()) return NextResponse.json({ error: "Log masuk diperlukan." }, { status: 401 });
@@ -15,17 +14,14 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   if (await readSession() !== "admin") return NextResponse.json({ error: "Akses admin diperlukan." }, { status: 403 });
-  const length = Number(request.headers.get("content-length") || 0);
-  if (length > MAX + 1024 * 1024) return NextResponse.json({ error: "Fail melebihi had 500 MB." }, { status: 413 });
-  const form = await request.formData(); const title = String(form.get("title") || "").trim(); const file = form.get("video");
+  const { title: rawTitle, driveFileId } = await request.json() as { title?: string; driveFileId?: string };
+  const title = String(rawTitle || "").trim();
   if (!title || title.length > 150) return NextResponse.json({ error: "Tajuk mesti antara 1 hingga 150 aksara." }, { status: 400 });
-  if (!(file instanceof File) || !TYPES.has(file.type)) return NextResponse.json({ error: "Gunakan fail MP4, WebM atau MOV." }, { status: 400 });
-  if (file.size > MAX) return NextResponse.json({ error: "Fail melebihi had 500 MB." }, { status: 413 });
+  if (!driveFileId) return NextResponse.json({ error: "Muat naik video belum selesai." }, { status: 400 });
+  const file = await driveFile(driveFileId);
+  if (!TYPES.has(file.mimeType)) return NextResponse.json({ error: "Gunakan fail MP4, WebM atau MOV." }, { status: 400 });
   await ensureSchema();
   const id = crypto.randomUUID(); const createdAt = new Date().toISOString();
-  const blob = await put(`videos/${id}/${file.name}`, file, { access: "private", contentType: file.type, addRandomSuffix: false });
-  try {
-    await sql()`INSERT INTO videos (id,title,filename,content_type,size,object_url,created_at) VALUES (${id},${title},${file.name},${file.type},${file.size},${blob.url},${createdAt})`;
-  } catch (error) { await del(blob.url); throw error; }
+  await sql()`INSERT INTO videos (id,title,filename,content_type,size,object_url,created_at) VALUES (${id},${title},${file.name},${file.mimeType},${Number(file.size)},${file.id},${createdAt})`;
   return NextResponse.json({ id, title }, { status: 201 });
 }

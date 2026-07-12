@@ -73,6 +73,23 @@ function VideoThumbnail({ video, index, onOpen }: { video: Video; index: number;
   </button>;
 }
 
+function VideoPreloader({ videos }: { videos: Video[] }) {
+  useEffect(() => {
+    const preloaders = videos.map((video) => {
+      const source = document.createElement("video");
+      const seekToTenSeconds = () => { if (source.duration > 10) source.currentTime = 10; };
+      source.muted = true; source.playsInline = true; source.preload = "auto";
+      source.addEventListener("loadedmetadata", seekToTenSeconds, { once: true });
+      source.src = `/api/videos/${video.id}/stream`;
+      source.load();
+      return source;
+    });
+    return () => preloaders.forEach((source) => { source.pause(); source.removeAttribute("src"); source.load(); });
+  }, [videos]); // The video list, not search results, controls background buffering.
+
+  return null;
+}
+
 export default function Home() {
   const [session, setSession] = useState<{ role: Role } | null>(null);
   const [checking, setChecking] = useState(true);
@@ -211,6 +228,7 @@ function Dashboard({ role, videos, allVideos, search, setSearch, selected, setSe
 
   return (
     <main className="app-shell">
+      <VideoPreloader videos={allVideos} />
       <header className="topbar">
         <div className="logo-row"><div className="brand-mark small">K</div><div><strong>Bonus K-Method</strong><span>Portal Pembelajaran</span></div></div>
         <div className="top-actions"><span className="role-badge">{role === "admin" ? "Admin" : "Student"}</span><button className="ghost" onClick={logout}>Log keluar ↗</button></div>

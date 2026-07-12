@@ -15,6 +15,24 @@ function formatDate(value: string) {
   return new Intl.DateTimeFormat("ms-MY", { day: "numeric", month: "short", year: "numeric" }).format(new Date(value));
 }
 
+async function thumbnailFromUpload(file: File) {
+  return new Promise<string | undefined>((resolve) => {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement("video");
+    const finish = (value?: string) => { URL.revokeObjectURL(url); resolve(value); };
+    video.muted = true; video.preload = "metadata"; video.src = url;
+    video.onloadedmetadata = () => { video.currentTime = video.duration > 0.01 ? 0.01 : 0; };
+    video.onseeked = () => {
+      const ratio = Math.min(1, 640 / video.videoWidth, 360 / video.videoHeight);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(video.videoWidth * ratio)); canvas.height = Math.max(1, Math.round(video.videoHeight * ratio));
+      canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
+      try { finish(canvas.toDataURL("image/jpeg", 0.78).split(",")[1]); } catch { finish(); }
+    };
+    video.onerror = () => finish();
+  });
+}
+
 function VideoThumbnail({ video, index, onOpen }: { video: Video; index: number; onOpen: (video: Video) => void }) {
   const [useFrameFallback, setUseFrameFallback] = useState(false);
   const [frame, setFrame] = useState<string | null>(null);
@@ -152,7 +170,8 @@ function Dashboard({ role, videos, allVideos, search, setSearch, selected, setSe
     const body = new FormData(e.currentTarget);
     const file = body.get("video");
     if (!(file instanceof File)) { setWorking(""); return; }
-    const session = await fetch("/api/videos/upload", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ filename: file.name, contentType: file.type, size: file.size }) });
+    const thumbnail = await thumbnailFromUpload(file);
+    const session = await fetch("/api/videos/upload", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ filename: file.name, contentType: file.type, size: file.size, thumbnail }) });
     const sessionData = await session.json().catch(() => ({}));
     if (!session.ok) { setNotice(sessionData.error || "Muat naik tidak dapat dimulakan."); setWorking(""); return; }
     const chunkSize = 8 * 1024 * 1024;

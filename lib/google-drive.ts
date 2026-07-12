@@ -29,9 +29,9 @@ async function accessToken() {
   return cachedToken.value;
 }
 
-export async function startDriveUpload(name: string, contentType: string, size: number) {
+export async function startDriveUpload(name: string, contentType: string, size: number, thumbnail?: string) {
   const token = await accessToken(); const { folderId } = config();
-  const response = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,name,mimeType,size", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json; charset=UTF-8", "X-Upload-Content-Type": contentType, "X-Upload-Content-Length": String(size) }, body: JSON.stringify({ name, parents: [folderId] }) });
+  const response = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,name,mimeType,size", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json; charset=UTF-8", "X-Upload-Content-Type": contentType, "X-Upload-Content-Length": String(size) }, body: JSON.stringify({ name, parents: [folderId], ...(thumbnail ? { contentHints: { thumbnail: { image: thumbnail, mimeType: "image/jpeg" } } } : {}) }) });
   const uploadUrl = response.headers.get("location");
   if (!response.ok || !uploadUrl) throw new Error("Tidak dapat memulakan muat naik Google Drive.");
   return uploadUrl;

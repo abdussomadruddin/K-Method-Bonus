@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { youtubeEmbedUrl } from "@/lib/youtube";
 
 type Role = "admin" | "student";
@@ -84,6 +84,27 @@ function Dashboard({ role, videos, allVideos, search, setSearch, selected, setSe
   const [uploadOpen, setUploadOpen] = useState(false);
   const [working, setWorking] = useState("");
   const [notice, setNotice] = useState("");
+  const [playerPlaying, setPlayerPlaying] = useState(true);
+  const [playerMuted, setPlayerMuted] = useState(true);
+  const playerRef = useRef<HTMLIFrameElement>(null);
+
+  useEffect(() => {
+    if (selected) { setPlayerPlaying(true); setPlayerMuted(true); }
+  }, [selected]);
+
+  function playerCommand(command: "playVideo" | "pauseVideo" | "mute" | "unMute") {
+    playerRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func: command, args: [] }), "https://www.youtube-nocookie.com");
+  }
+
+  function togglePlayback() {
+    playerCommand(playerPlaying ? "pauseVideo" : "playVideo");
+    setPlayerPlaying((value) => !value);
+  }
+
+  function toggleSound() {
+    playerCommand(playerMuted ? "unMute" : "mute");
+    setPlayerMuted((value) => !value);
+  }
   async function addVideo(e: FormEvent<HTMLFormElement>) {
     e.preventDefault(); setNotice(""); setWorking("add");
     const body = new FormData(e.currentTarget);
@@ -134,7 +155,7 @@ function Dashboard({ role, videos, allVideos, search, setSearch, selected, setSe
           </article>)}</section>}
       </section>
       {role === "admin" && <footer><span>© 2026 Bonus K-Method</span><span>Belajar • Praktik • Kuasai</span></footer>}
-      {selected && <div className="modal-backdrop" onMouseDown={() => setSelected(null)}><section className="player-modal" onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={selected.title}><button className="modal-close" onClick={() => setSelected(null)} aria-label="Tutup">×</button><iframe className="youtube-player" src={youtubeEmbedUrl(selected.youtubeId, window.location.origin)} title={selected.title} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen={false} referrerPolicy="strict-origin-when-cross-origin" /><div><p className="eyebrow">VIDEO PEMBELAJARAN</p><h2>{selected.title}</h2></div></section></div>}
+      {selected && <div className="modal-backdrop player-backdrop" onMouseDown={() => setSelected(null)} onContextMenu={(e) => e.preventDefault()}><section className="player-modal" onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={selected.title}><button className="modal-close" onClick={() => setSelected(null)} aria-label="Tutup">×</button><section className={`player-frame${role === "student" ? " student-player" : ""}`}><iframe ref={playerRef} className="youtube-player" src={youtubeEmbedUrl(selected.youtubeId, window.location.origin, role === "student")} title={selected.title} allow="autoplay; encrypted-media; picture-in-picture" sandbox="allow-scripts allow-same-origin allow-presentation" allowFullScreen={false} referrerPolicy="strict-origin-when-cross-origin" />{role === "student" && <><button type="button" className="player-surface" onClick={togglePlayback} onContextMenu={(e) => e.preventDefault()} aria-label={playerPlaying ? "Jeda video" : "Mainkan video"}><span>{playerPlaying ? "❚❚" : "▶"}</span></button><div className="lms-player-controls"><button type="button" onClick={togglePlayback}>{playerPlaying ? "❚❚ Jeda" : "▶ Main"}</button><button type="button" onClick={toggleSound}>{playerMuted ? "🔇 Hidupkan suara" : "🔊 Senyapkan"}</button></div></>}</section><div><p className="eyebrow">VIDEO PEMBELAJARAN</p><h2>{selected.title}</h2></div></section></div>}
       {uploadOpen && <div className="modal-backdrop" onMouseDown={() => setUploadOpen(false)}><form className="upload-modal" onSubmit={addVideo} onMouseDown={(e) => e.stopPropagation()}><button type="button" className="modal-close" onClick={() => setUploadOpen(false)}>×</button><p className="eyebrow">KANDUNGAN BAHARU</p><h2>Tambah video YouTube</h2><p className="muted">Gunakan pautan video YouTube yang ditetapkan sebagai Unlisted.</p><label htmlFor="title">Tajuk video</label><input id="title" name="title" maxLength={150} required placeholder="Contoh: Pengenalan K-Method" /><label htmlFor="youtubeUrl">Pautan YouTube</label><input id="youtubeUrl" name="youtubeUrl" type="url" required placeholder="https://youtu.be/..." /><button className="primary full" disabled={working === "add"}>{working === "add" ? "Sedang menambah..." : "Tambah video"}</button></form></div>}
     </main>
   );

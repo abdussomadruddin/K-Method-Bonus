@@ -20,12 +20,13 @@ export function youtubeVideoId(value: string) {
   }
 }
 
-export function youtubeEmbedUrl(videoId: string, origin?: string) {
+export function youtubeEmbedUrl(videoId: string, origin?: string, restricted = false) {
   const params = new URLSearchParams({
     autoplay: "1",
     mute: "1",
-    controls: "1",
+    controls: restricted ? "0" : "1",
     disablekb: "1",
+    enablejsapi: "1",
     fs: "0",
     iv_load_policy: "3",
     modestbranding: "1",

@@ -15,7 +15,6 @@ function formatDate(value: string) {
 }
 
 export default function Home() {
-  const [role, setRole] = useState<Role>("student");
   const [session, setSession] = useState<{ role: Role } | null>(null);
   const [checking, setChecking] = useState(true);
   const [videos, setVideos] = useState<Video[]>([]);
@@ -42,9 +41,9 @@ export default function Home() {
   async function login(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setMessage(""); setBusy(true);
     const form = new FormData(event.currentTarget);
-    const response = await fetch("/api/session", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ role, password: form.get("password") }) });
+    const response = await fetch("/api/session", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ password: form.get("password") }) });
     const data = await response.json().catch(() => ({}));
-    if (response.ok) { setSession({ role }); setMessage(""); }
+    if (response.ok) { setSession({ role: data.role }); setMessage(""); }
     else setMessage(data.error || "Log masuk gagal. Sila cuba lagi.");
     setBusy(false);
   }
@@ -71,12 +70,7 @@ export default function Home() {
         <form className="login-card" onSubmit={login}>
           <p className="eyebrow">SELAMAT DATANG</p>
           <h2>Log masuk ke portal</h2>
-          <p className="muted">Pilih jenis akses anda untuk meneruskan.</p>
-          <fieldset className="role-switch">
-            <legend className="sr-only">Jenis akses</legend>
-            <button type="button" className={role === "student" ? "active" : ""} onClick={() => setRole("student")}><span>◎</span> Student</button>
-            <button type="button" className={role === "admin" ? "active" : ""} onClick={() => setRole("admin")}><span>◇</span> Admin</button>
-          </fieldset>
+          <p className="muted">Masukkan kata laluan anda untuk meneruskan.</p>
           <label htmlFor="password">Kata laluan</label>
           <input id="password" name="password" type="password" autoComplete="current-password" placeholder="Masukkan kata laluan" required />
           {message && <p className="error" role="alert">{message}</p>}

@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { flushSync } from "react-dom";
 
 type Role = "admin" | "student";
 type Video = { id: string; title: string; filename: string; contentType: string; size: number; createdAt: string };
@@ -178,13 +177,7 @@ function Dashboard({ role, videos, allVideos, search, setSearch, selected, setSe
 
   function openVideo(video: Video) {
     setPlayerLoading(true);
-    if (role !== "student") { setSelected(video); return; }
-    flushSync(() => setSelected(video));
-    const player = videoRef.current as (HTMLVideoElement & { webkitEnterFullscreen?: () => void }) | null;
-    if (!player) return;
-    if (typeof player.webkitEnterFullscreen === "function") player.webkitEnterFullscreen();
-    else void player.requestFullscreen?.().catch(() => document.documentElement.requestFullscreen?.().catch(() => {}));
-    void player.play().catch(() => {});
+    setSelected(video);
   }
 
   function closeVideo() {

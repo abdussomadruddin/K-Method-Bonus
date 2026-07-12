@@ -85,6 +85,16 @@ export async function streamDriveFile(id: string, range: string | null) {
   return fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?alt=media`, { headers: { Authorization: `Bearer ${token}`, ...(range ? { Range: range } : {}) } });
 }
 
+export async function driveThumbnail(id: string) {
+  const token = await accessToken();
+  const metadata = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?fields=thumbnailLink`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!metadata.ok) return null;
+  const { thumbnailLink } = await metadata.json() as { thumbnailLink?: string };
+  if (!thumbnailLink) return null;
+  const thumbnail = await fetch(thumbnailLink, { headers: { Authorization: `Bearer ${token}` } });
+  return thumbnail.ok && thumbnail.body ? thumbnail : null;
+}
+
 export async function deleteDriveFile(id: string) {
   const token = await accessToken();
   const response = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });

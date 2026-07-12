@@ -1,27 +1,28 @@
-import { createSign } from "node:crypto";
-
-const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 let cachedToken: { value: string; expiresAt: number } | null = null;
 
-function base64Url(value: string) { return Buffer.from(value).toString("base64url"); }
-
 function config() {
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const privateKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, "\n");
+  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+  const refreshToken = process.env.GOOGLE_OAUTH_REFRESH_TOKEN;
   const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
-  if (!email || !privateKey || !folderId) throw new Error("Google Drive belum dikonfigurasi.");
-  return { email, privateKey, folderId };
+  if (!clientId || !clientSecret || !refreshToken || !folderId) throw new Error("Google Drive OAuth belum dikonfigurasi.");
+  return { clientId, clientSecret, refreshToken, folderId };
 }
 
 async function accessToken() {
   if (cachedToken && cachedToken.expiresAt > Date.now() + 60_000) return cachedToken.value;
-  const { email, privateKey } = config();
-  const now = Math.floor(Date.now() / 1000);
-  const unsigned = `${base64Url(JSON.stringify({ alg: "RS256", typ: "JWT" }))}.${base64Url(JSON.stringify({ iss: email, scope: DRIVE_SCOPE, aud: TOKEN_URL, iat: now, exp: now + 3600 }))}`;
-  const signer = createSign("RSA-SHA256"); signer.update(unsigned);
-  const assertion = `${unsigned}.${signer.sign(privateKey, "base64url")}`;
-  const response = await fetch(TOKEN_URL, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion }) });
+  const { clientId, clientSecret, refreshToken } = config();
+  const response = await fetch(TOKEN_URL, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: "refresh_token",
+    }),
+  });
   if (!response.ok) throw new Error("Tidak dapat mendapatkan akses Google Drive.");
   const data = await response.json() as { access_token: string; expires_in: number };
   cachedToken = { value: data.access_token, expiresAt: Date.now() + data.expires_in * 1000 };

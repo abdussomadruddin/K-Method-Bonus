@@ -6,10 +6,6 @@ import { youtubeEmbedUrl } from "@/lib/youtube";
 type Role = "admin" | "student";
 type Video = { id: string; title: string; youtubeId: string; createdAt: string };
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("ms-MY", { day: "numeric", month: "short", year: "numeric" }).format(new Date(value));
-}
-
 export default function Home() {
   const [session, setSession] = useState<{ role: Role } | null>(null);
   const [checking, setChecking] = useState(true);
@@ -150,8 +146,8 @@ function Dashboard({ role, videos, allVideos, search, setSearch, selected, setSe
         {notice && <div className="notice" role="status">{notice}<button onClick={() => setNotice("")}>×</button></div>}
         {videos.length === 0 ? <section className="empty"><div>▷</div><h2>{search ? "Tiada video ditemui" : "Belum ada video"}</h2><p>{search ? "Cuba kata carian yang lain." : role === "admin" ? "Muat naik video pertama untuk mula membina perpustakaan." : "Kandungan pembelajaran akan muncul di sini."}</p></section> :
           <section className="video-grid">{videos.map((video, index) => <article className="video-card" key={video.id}>
-            <button className="thumbnail" onClick={() => setSelected(video)} aria-label={`Mainkan ${video.title}`}><span className="number">{String(index + 1).padStart(2, "0")}</span><span className="play">▶</span><span className="duration">VIDEO</span></button>
-            <div className="card-body"><h2>{video.title}</h2><p>{formatDate(video.createdAt)} · YouTube Unlisted</p>{role === "admin" && <div className="card-actions"><button onClick={() => edit(video)}>Ubah tajuk</button><button className="danger" disabled={working === video.id} onClick={() => remove(video)}>Padam</button></div>}</div>
+            <button className="thumbnail" onClick={() => setSelected(video)} aria-label={`Mainkan ${video.title}`}><img src={`https://i.ytimg.com/vi/${video.youtubeId}/maxresdefault.jpg`} onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = `https://i.ytimg.com/vi/${video.youtubeId}/hqdefault.jpg`; }} alt="" loading="lazy" draggable={false} referrerPolicy="no-referrer" /><span className="number">{String(index + 1).padStart(2, "0")}</span><span className="play">▶</span><span className="duration">VIDEO</span></button>
+            <div className="card-body"><h2>{video.title}</h2>{role === "admin" && <div className="card-actions"><button onClick={() => edit(video)}>Ubah tajuk</button><button className="danger" disabled={working === video.id} onClick={() => remove(video)}>Padam</button></div>}</div>
           </article>)}</section>}
       </section>
       {role === "admin" && <footer><span>© 2026 Bonus K-Method</span><span>Belajar • Praktik • Kuasai</span></footer>}

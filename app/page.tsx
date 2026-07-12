@@ -73,19 +73,27 @@ function VideoThumbnail({ video, index, onOpen }: { video: Video; index: number;
   </button>;
 }
 
-function VideoPreloader({ videos }: { videos: Video[] }) {
+function VideoPreloader({ videos, paused }: { videos: Video[]; paused: boolean }) {
   useEffect(() => {
-    const preloaders = videos.map((video) => {
-      const source = document.createElement("video");
-      const seekToTenSeconds = () => { if (source.duration > 10) source.currentTime = 10; };
-      source.muted = true; source.playsInline = true; source.preload = "auto";
-      source.addEventListener("loadedmetadata", seekToTenSeconds, { once: true });
-      source.src = `/api/videos/${video.id}/stream`;
-      source.load();
-      return source;
-    });
-    return () => preloaders.forEach((source) => { source.pause(); source.removeAttribute("src"); source.load(); });
-  }, [videos]); // The video list, not search results, controls background buffering.
+    let preloaders: HTMLVideoElement[] = [];
+    if (paused) return;
+    // Let a video opened immediately after landing get the available bandwidth first.
+    const timer = window.setTimeout(() => {
+      preloaders = videos.map((video) => {
+        const source = document.createElement("video");
+        const seekToTenSeconds = () => { if (source.duration > 10) source.currentTime = 10; };
+        source.muted = true; source.playsInline = true; source.preload = "auto";
+        source.addEventListener("loadedmetadata", seekToTenSeconds, { once: true });
+        source.src = `/api/videos/${video.id}/stream`;
+        source.load();
+        return source;
+      });
+    }, 5000);
+    return () => {
+      window.clearTimeout(timer);
+      preloaders.forEach((source) => { source.pause(); source.removeAttribute("src"); source.load(); });
+    };
+  }, [paused, videos]); // The video list, not search results, controls background buffering.
 
   return null;
 }
@@ -164,10 +172,12 @@ function Dashboard({ role, videos, allVideos, search, setSearch, selected, setSe
   const [uploadOpen, setUploadOpen] = useState(false);
   const [working, setWorking] = useState("");
   const [notice, setNotice] = useState("");
+  const [playerLoading, setPlayerLoading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   function openVideo(video: Video) {
+    setPlayerLoading(true);
     if (role !== "student") { setSelected(video); return; }
     flushSync(() => setSelected(video));
     const player = videoRef.current as (HTMLVideoElement & { webkitEnterFullscreen?: () => void }) | null;
@@ -178,6 +188,7 @@ function Dashboard({ role, videos, allVideos, search, setSearch, selected, setSe
   }
 
   function closeVideo() {
+    setPlayerLoading(false);
     setSelected(null);
     if (document.fullscreenElement) void document.exitFullscreen?.();
   }
@@ -228,7 +239,7 @@ function Dashboard({ role, videos, allVideos, search, setSearch, selected, setSe
 
   return (
     <main className="app-shell">
-      <VideoPreloader videos={allVideos} />
+      <VideoPreloader videos={allVideos} paused={Boolean(selected)} />
       <header className="topbar">
         <div className="logo-row"><div className="brand-mark small">K</div><div><strong>Bonus K-Method</strong><span>Portal Pembelajaran</span></div></div>
         <div className="top-actions"><span className="role-badge">{role === "admin" ? "Admin" : "Student"}</span><button className="ghost" onClick={logout}>Log keluar ↗</button></div>
@@ -244,7 +255,7 @@ function Dashboard({ role, videos, allVideos, search, setSearch, selected, setSe
           </article>)}</section>}
       </section>
       {role === "admin" && <footer><span>© 2026 Bonus K-Method</span><span>Belajar • Praktik • Kuasai</span></footer>}
-      {selected && <div className="modal-backdrop" onMouseDown={closeVideo}><section className="player-modal" onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={selected.title}><button className="modal-close" onClick={closeVideo} aria-label="Tutup">×</button><video ref={videoRef} src={`/api/videos/${selected.id}/stream`} controls autoPlay playsInline controlsList={role === "student" ? "nodownload" : undefined} onCanPlay={() => { if (role === "student") void videoRef.current?.play().catch(() => {}); }} /><div><p className="eyebrow">VIDEO PEMBELAJARAN</p><h2>{selected.title}</h2></div></section></div>}
+      {selected && <div className="modal-backdrop" onMouseDown={closeVideo}><section className="player-modal" onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={selected.title}><button className="modal-close" onClick={closeVideo} aria-label="Tutup">×</button>{playerLoading && <div className="player-loading" role="status"><div className="loader" aria-label="Memuatkan video" /><span>Sila tunggu sebentar…</span></div>}<video ref={videoRef} src={`/api/videos/${selected.id}/stream`} controls autoPlay playsInline controlsList={role === "student" ? "nodownload" : undefined} onCanPlay={() => { if (role === "student") void videoRef.current?.play().catch(() => {}); }} onPlaying={() => setPlayerLoading(false)} onWaiting={() => setPlayerLoading(true)} onError={() => { setPlayerLoading(false); setNotice("Video tidak dapat dimuatkan."); }} /><div><p className="eyebrow">VIDEO PEMBELAJARAN</p><h2>{selected.title}</h2></div></section></div>}
       {uploadOpen && <div className="modal-backdrop" onMouseDown={() => setUploadOpen(false)}><form className="upload-modal" onSubmit={upload} onMouseDown={(e) => e.stopPropagation()}><button type="button" className="modal-close" onClick={() => setUploadOpen(false)}>×</button><p className="eyebrow">KANDUNGAN BAHARU</p><h2>Muat naik video</h2><label htmlFor="title">Tajuk video</label><input id="title" name="title" maxLength={150} required placeholder="Contoh: Pengenalan K-Method" /><label htmlFor="video">Fail video</label><div className="file-drop" onClick={() => fileRef.current?.click()}>↑<strong>Pilih fail video</strong><span>MP4, WebM atau MOV · Fail besar disokong</span></div><input ref={fileRef} className="sr-only" id="video" name="video" type="file" accept="video/mp4,video/webm,video/quicktime" required /><button className="primary full" disabled={working === "upload"}>{working === "upload" ? "Sedang memuat naik..." : "Muat naik video"}</button></form></div>}
     </main>
   );

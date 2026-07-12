@@ -89,6 +89,17 @@ function Dashboard({ role, videos, allVideos, search, setSearch, selected, setSe
   const [working, setWorking] = useState("");
   const [notice, setNotice] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  function openVideo(video: Video) {
+    if (role === "student") void document.documentElement.requestFullscreen?.().catch(() => {});
+    setSelected(video);
+  }
+
+  function closeVideo() {
+    setSelected(null);
+    if (document.fullscreenElement) void document.exitFullscreen?.();
+  }
 
   async function upload(e: FormEvent<HTMLFormElement>) {
     e.preventDefault(); setNotice(""); setWorking("upload");
@@ -140,20 +151,17 @@ function Dashboard({ role, videos, allVideos, search, setSearch, selected, setSe
         <div className="top-actions"><span className="role-badge">{role === "admin" ? "Admin" : "Student"}</span><button className="ghost" onClick={logout}>Log keluar ↗</button></div>
       </header>
       <section className="dashboard">
-        <div className="welcome-row">
-          <div><p className="eyebrow">{role === "admin" ? "PANEL PENGURUSAN" : "PERPUSTAKAAN VIDEO"}</p><h1>{role === "admin" ? "Urus kandungan anda" : "Teruskan pembelajaran anda"}</h1><p className="muted">{role === "admin" ? "Tambah dan kemas kini video pembelajaran di satu tempat." : "Pilih video dan mula belajar mengikut masa anda."}</p></div>
-          {role === "admin" && <button className="primary" onClick={() => setUploadOpen(true)}>＋ Muat naik video</button>}
-        </div>
+        {role === "admin" && <div className="welcome-row"><div><p className="eyebrow">PANEL PENGURUSAN</p><h1>Urus kandungan anda</h1><p className="muted">Tambah dan kemas kini video pembelajaran di satu tempat.</p></div><button className="primary" onClick={() => setUploadOpen(true)}>＋ Muat naik video</button></div>}
         <div className="toolbar"><div className="search"><span>⌕</span><input aria-label="Cari video" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari tajuk video..." /></div><span className="count">{allVideos.length} video</span></div>
         {notice && <div className="notice" role="status">{notice}<button onClick={() => setNotice("")}>×</button></div>}
         {videos.length === 0 ? <section className="empty"><div>▷</div><h2>{search ? "Tiada video ditemui" : "Belum ada video"}</h2><p>{search ? "Cuba kata carian yang lain." : role === "admin" ? "Muat naik video pertama untuk mula membina perpustakaan." : "Kandungan pembelajaran akan muncul di sini."}</p></section> :
           <section className="video-grid">{videos.map((video, index) => <article className="video-card" key={video.id}>
-            <button className="thumbnail" onClick={() => setSelected(video)} aria-label={`Mainkan ${video.title}`}><span className="number">{String(index + 1).padStart(2, "0")}</span><span className="play">▶</span><span className="duration">VIDEO</span></button>
+            <button className="thumbnail" onClick={() => openVideo(video)} aria-label={`Mainkan ${video.title}`}><span className="number">{String(index + 1).padStart(2, "0")}</span><span className="play">▶</span><span className="duration">VIDEO</span></button>
             <div className="card-body"><h2>{video.title}</h2><p>{formatDate(video.createdAt)} · {formatSize(video.size)}</p>{role === "admin" && <div className="card-actions"><button onClick={() => edit(video)}>Ubah tajuk</button><button className="danger" disabled={working === video.id} onClick={() => remove(video)}>Padam</button></div>}</div>
           </article>)}</section>}
       </section>
-      <footer><span>© 2026 Bonus K-Method</span><span>Belajar • Praktik • Kuasai</span></footer>
-      {selected && <div className="modal-backdrop" onMouseDown={() => setSelected(null)}><section className="player-modal" onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={selected.title}><button className="modal-close" onClick={() => setSelected(null)} aria-label="Tutup">×</button><video src={`/api/videos/${selected.id}/stream`} controls autoPlay playsInline controlsList={role === "student" ? "nodownload" : undefined} /><div><p className="eyebrow">VIDEO PEMBELAJARAN</p><h2>{selected.title}</h2></div></section></div>}
+      {role === "admin" && <footer><span>© 2026 Bonus K-Method</span><span>Belajar • Praktik • Kuasai</span></footer>}
+      {selected && <div className="modal-backdrop" onMouseDown={closeVideo}><section className="player-modal" onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={selected.title}><button className="modal-close" onClick={closeVideo} aria-label="Tutup">×</button><video ref={videoRef} src={`/api/videos/${selected.id}/stream`} controls autoPlay playsInline controlsList={role === "student" ? "nodownload" : undefined} onCanPlay={() => { if (role === "student") void videoRef.current?.play().catch(() => {}); }} /><div><p className="eyebrow">VIDEO PEMBELAJARAN</p><h2>{selected.title}</h2></div></section></div>}
       {uploadOpen && <div className="modal-backdrop" onMouseDown={() => setUploadOpen(false)}><form className="upload-modal" onSubmit={upload} onMouseDown={(e) => e.stopPropagation()}><button type="button" className="modal-close" onClick={() => setUploadOpen(false)}>×</button><p className="eyebrow">KANDUNGAN BAHARU</p><h2>Muat naik video</h2><label htmlFor="title">Tajuk video</label><input id="title" name="title" maxLength={150} required placeholder="Contoh: Pengenalan K-Method" /><label htmlFor="video">Fail video</label><div className="file-drop" onClick={() => fileRef.current?.click()}>↑<strong>Pilih fail video</strong><span>MP4, WebM atau MOV · Fail besar disokong</span></div><input ref={fileRef} className="sr-only" id="video" name="video" type="file" accept="video/mp4,video/webm,video/quicktime" required /><button className="primary full" disabled={working === "upload"}>{working === "upload" ? "Sedang memuat naik..." : "Muat naik video"}</button></form></div>}
     </main>
   );

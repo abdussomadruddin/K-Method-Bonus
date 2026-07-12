@@ -16,8 +16,41 @@ function formatDate(value: string) {
 }
 
 function VideoThumbnail({ video, index, onOpen }: { video: Video; index: number; onOpen: (video: Video) => void }) {
+  const [useFrameFallback, setUseFrameFallback] = useState(false);
+  const [frame, setFrame] = useState<string | null>(null);
+  const sourceRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (!useFrameFallback) return;
+    const source = sourceRef.current;
+    if (!source) return;
+    let active = true;
+    const capture = () => {
+      if (!active || !source.videoWidth || !source.videoHeight) return;
+      const canvas = document.createElement("canvas");
+      canvas.width = source.videoWidth;
+      canvas.height = source.videoHeight;
+      canvas.getContext("2d")?.drawImage(source, 0, 0, canvas.width, canvas.height);
+      try { setFrame(canvas.toDataURL("image/jpeg", 0.8)); } catch { /* Keep the fallback artwork. */ }
+    };
+    const seekToFirstFrame = () => {
+      if (Number.isFinite(source.duration) && source.duration > 0.01) source.currentTime = 0.01;
+      else capture();
+    };
+    source.addEventListener("loadedmetadata", seekToFirstFrame);
+    source.addEventListener("seeked", capture);
+    if (source.readyState >= 1) seekToFirstFrame();
+    return () => {
+      active = false;
+      source.removeEventListener("loadedmetadata", seekToFirstFrame);
+      source.removeEventListener("seeked", capture);
+    };
+  }, [useFrameFallback, video.id]);
+
   return <button className="thumbnail" onClick={() => onOpen(video)} aria-label={`Mainkan ${video.title}`}>
-    <img src={`/api/videos/${video.id}/thumbnail`} alt="" onError={(event) => { event.currentTarget.style.display = "none"; }} />
+    {!useFrameFallback && <img src={`/api/videos/${video.id}/thumbnail`} alt="" onError={() => setUseFrameFallback(true)} />}
+    {frame && <img src={frame} alt="" />}
+    {useFrameFallback && <video ref={sourceRef} className="thumbnail-source" src={`/api/videos/${video.id}/stream`} muted playsInline preload="metadata" aria-hidden="true" tabIndex={-1} />}
     <span className="number">{String(index + 1).padStart(2, "0")}</span><span className="play">▶</span><span className="duration">VIDEO</span>
   </button>;
 }

@@ -10,7 +10,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   return new Response(thumbnail.body, {
     headers: {
       "Content-Type": thumbnail.headers.get("content-type") || "image/jpeg",
-      "Cache-Control": "private, max-age=86400",
+      "Cache-Control": "private, max-age=300",
     },
   });
 }

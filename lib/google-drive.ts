@@ -39,9 +39,45 @@ export async function startDriveUpload(name: string, contentType: string, size: 
 
 export async function driveFile(id: string) {
   const token = await accessToken();
-  const response = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?fields=id,name,mimeType,size`, { headers: { Authorization: `Bearer ${token}` } });
+  const response = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?fields=id,name,mimeType,size,createdTime,appProperties`, { headers: { Authorization: `Bearer ${token}` } });
   if (!response.ok) throw new Error("Fail video tidak ditemui di Google Drive.");
-  return response.json() as Promise<{ id: string; name: string; mimeType: string; size: string }>;
+  return response.json() as Promise<DriveFile>;
+}
+
+type DriveFile = {
+  id: string;
+  name: string;
+  mimeType: string;
+  size: string;
+  createdTime: string;
+  appProperties?: { lmsManaged?: string; lmsTitle?: string };
+};
+
+export async function listDriveVideos() {
+  const token = await accessToken();
+  const { folderId } = config();
+  const query = `'${folderId.replaceAll("'", "\\'")}' in parents and trashed = false and appProperties has { key='lmsManaged' and value='true' }`;
+  const params = new URLSearchParams({
+    q: query,
+    orderBy: "createdTime desc",
+    pageSize: "1000",
+    fields: "files(id,name,mimeType,size,createdTime,appProperties)",
+  });
+  const response = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!response.ok) throw new Error("Tidak dapat mendapatkan senarai video Google Drive.");
+  const data = await response.json() as { files?: DriveFile[] };
+  return data.files || [];
+}
+
+export async function saveDriveVideo(id: string, title: string) {
+  const token = await accessToken();
+  const response = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?fields=id,name,mimeType,size,createdTime,appProperties`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ appProperties: { lmsManaged: "true", lmsTitle: title } }),
+  });
+  if (!response.ok) throw new Error("Tidak dapat menyimpan maklumat video di Google Drive.");
+  return response.json() as Promise<DriveFile>;
 }
 
 export async function streamDriveFile(id: string, range: string | null) {

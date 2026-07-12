@@ -1,14 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readSession } from "@/lib/auth";
-import { ensureSchema, sql } from "@/lib/runtime";
-import { driveFile } from "@/lib/google-drive";
+import { driveFile, listDriveVideos, saveDriveVideo } from "@/lib/google-drive";
 
 const TYPES = new Set(["video/mp4", "video/webm", "video/quicktime"]);
 
 export async function GET() {
   if (!await readSession()) return NextResponse.json({ error: "Log masuk diperlukan." }, { status: 401 });
-  await ensureSchema();
-  const videos = await sql()`SELECT id, title, filename, content_type as "contentType", size, created_at as "createdAt" FROM videos ORDER BY created_at DESC`;
+  const files = await listDriveVideos();
+  const videos = files.filter((file) => TYPES.has(file.mimeType)).map((file) => ({
+    id: file.id,
+    title: file.appProperties?.lmsTitle || file.name,
+    filename: file.name,
+    contentType: file.mimeType,
+    size: Number(file.size),
+    createdAt: file.createdTime,
+  }));
   return NextResponse.json({ videos });
 }
 
@@ -20,8 +26,6 @@ export async function POST(request: NextRequest) {
   if (!driveFileId) return NextResponse.json({ error: "Muat naik video belum selesai." }, { status: 400 });
   const file = await driveFile(driveFileId);
   if (!TYPES.has(file.mimeType)) return NextResponse.json({ error: "Gunakan fail MP4, WebM atau MOV." }, { status: 400 });
-  await ensureSchema();
-  const id = crypto.randomUUID(); const createdAt = new Date().toISOString();
-  await sql()`INSERT INTO videos (id,title,filename,content_type,size,object_url,created_at) VALUES (${id},${title},${file.name},${file.mimeType},${Number(file.size)},${file.id},${createdAt})`;
-  return NextResponse.json({ id, title }, { status: 201 });
+  const saved = await saveDriveVideo(file.id, title);
+  return NextResponse.json({ id: saved.id, title }, { status: 201 });
 }

@@ -81,11 +81,11 @@ function Dashboard({ role, videos, allVideos, search, setSearch, selected, setSe
   const [working, setWorking] = useState("");
   const [notice, setNotice] = useState("");
   const [playerPlaying, setPlayerPlaying] = useState(true);
-  const [playerMuted, setPlayerMuted] = useState(true);
+  const [playerMuted, setPlayerMuted] = useState(false);
   const playerRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
-    if (selected) { setPlayerPlaying(true); setPlayerMuted(true); }
+    if (selected) { setPlayerPlaying(true); setPlayerMuted(false); }
   }, [selected]);
 
   function playerCommand(command: "playVideo" | "pauseVideo" | "mute" | "unMute") {

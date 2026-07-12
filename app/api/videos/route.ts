@@ -4,12 +4,16 @@ import { driveFile, listDriveVideos, saveDriveVideo } from "@/lib/google-drive";
 
 const TYPES = new Set(["video/mp4", "video/webm", "video/quicktime"]);
 
+function titleFromFilename(filename: string) {
+  return filename.replace(/\.(mp4|webm|mov)$/i, "").trim() || filename;
+}
+
 export async function GET() {
   if (!await readSession()) return NextResponse.json({ error: "Log masuk diperlukan." }, { status: 401 });
   const files = await listDriveVideos();
   const videos = files.filter((file) => TYPES.has(file.mimeType)).map((file) => ({
     id: file.id,
-    title: file.appProperties?.lmsTitle || file.name,
+    title: file.appProperties?.lmsTitle || titleFromFilename(file.name),
     filename: file.name,
     contentType: file.mimeType,
     size: Number(file.size),

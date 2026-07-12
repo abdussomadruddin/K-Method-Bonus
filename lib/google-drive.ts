@@ -56,7 +56,7 @@ type DriveFile = {
 export async function listDriveVideos() {
   const token = await accessToken();
   const { folderId } = config();
-  const query = `'${folderId.replaceAll("'", "\\'")}' in parents and trashed = false and appProperties has { key='lmsManaged' and value='true' }`;
+  const query = `'${folderId.replaceAll("'", "\\'")}' in parents and trashed = false`;
   const params = new URLSearchParams({
     q: query,
     orderBy: "createdTime desc",

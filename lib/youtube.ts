@@ -23,6 +23,7 @@ export function youtubeVideoId(value: string) {
 export function youtubeEmbedUrl(videoId: string, origin?: string) {
   const params = new URLSearchParams({
     autoplay: "1",
+    mute: "1",
     controls: "1",
     disablekb: "1",
     fs: "0",

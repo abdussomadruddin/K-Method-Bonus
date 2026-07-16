@@ -56,9 +56,9 @@ export default function Home() {
   if (!session) return (
     <main className="login-page">
       <section className="brand-panel">
-        <div className="brand-mark">K</div>
+        <div className="brand-mark"><img src="/icon-192.png" alt="Digital Dominate" /></div>
         <div>
-          <p className="eyebrow light">BONUS K-METHOD</p>
+          <p className="eyebrow light">DIGITAL DOMINATE</p>
           <h1>Belajar dengan fokus.<br />Kuasa dengan ilmu.</h1>
           <p className="brand-copy">Ruang pembelajaran video yang tersusun untuk membantu anda bergerak selangkah demi selangkah.</p>
         </div>
@@ -200,7 +200,7 @@ function Dashboard({ role, videos, allVideos, search, setSearch, selected, setSe
   return (
     <main className="app-shell">
       <header className="topbar">
-        <div className="logo-row"><div className="brand-mark small">K</div><div><strong>Bonus K-Method</strong><span>Portal Pembelajaran</span></div></div>
+        <div className="logo-row"><div className="brand-mark small"><img src="/icon-192.png" alt="" /></div><div><strong>Digital Dominate</strong><span>Portal Pembelajaran</span></div></div>
         <div className="top-actions"><span className="role-badge">{role === "admin" ? "Admin" : "Student"}</span><button className="ghost" onClick={logout}>Log keluar ↗</button></div>
       </header>
       <section className={`dashboard${role === "student" ? " video-library" : ""}`}>
@@ -217,7 +217,7 @@ function Dashboard({ role, videos, allVideos, search, setSearch, selected, setSe
           </article>)}</section>}
       </section>
       {selected && <div className="modal-backdrop player-backdrop" onMouseDown={() => setSelected(null)} onContextMenu={(e) => e.preventDefault()}><section className="player-modal" onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={selected.title}><button className="modal-close" onClick={() => setSelected(null)} aria-label="Tutup">×</button><section ref={playerFrameRef} className={`player-frame${role === "student" ? " student-player" : ""}`}><iframe ref={playerRef} className="youtube-player" src={youtubeEmbedUrl(selected.youtubeId, window.location.origin, role === "student")} title={selected.title} allow="autoplay; encrypted-media; picture-in-picture" sandbox="allow-scripts allow-same-origin allow-presentation" allowFullScreen={false} referrerPolicy="strict-origin-when-cross-origin" onLoad={connectPlayer} />{role === "student" && <><button type="button" className="player-surface" onClick={togglePlayback} onContextMenu={(e) => e.preventDefault()} aria-label={playerPlaying ? "Jeda video" : "Mainkan video"}><span>{playerPlaying ? "❚❚" : "▶"}</span></button><div className="lms-player-controls"><div className="lms-seek"><span>{formatPlayerTime(currentTime)}</span><input type="range" min="0" max={duration || 0} step="1" value={Math.min(currentTime, duration || 0)} onChange={(event) => seekVideo(Number(event.target.value))} aria-label="Pilih masa video" /><span>{formatPlayerTime(duration)}</span></div><button type="button" onClick={togglePlayback}>{playerPlaying ? "❚❚ Jeda" : "▶ Main"}</button><button type="button" onClick={toggleSound}>{playerMuted ? "🔇 Hidupkan suara" : "🔊 Senyapkan"}</button><label className="lms-speed"><span>Kelajuan</span><select value={playbackRate} onChange={(event) => changePlaybackRate(Number(event.target.value))}>{[1, 1.25, 1.5, 2, 2.5, 3].map((rate) => <option key={rate} value={rate}>{rate}×</option>)}</select></label><button type="button" onClick={toggleFullscreen}>{playerFullscreen ? "⊙ Keluar skrin penuh" : "⛶ Skrin penuh"}</button></div></>}</section><div><p className="eyebrow">VIDEO PEMBELAJARAN</p><h2>{selected.title}</h2></div></section></div>}
-      {uploadOpen && <div className="modal-backdrop" onMouseDown={() => setUploadOpen(false)}><form className="upload-modal" onSubmit={addVideo} onMouseDown={(e) => e.stopPropagation()}><button type="button" className="modal-close" onClick={() => setUploadOpen(false)}>×</button><p className="eyebrow">KANDUNGAN BAHARU</p><h2>Tambah video YouTube</h2><p className="muted">Gunakan pautan video YouTube yang ditetapkan sebagai Unlisted.</p><label htmlFor="title">Tajuk video</label><input id="title" name="title" maxLength={150} required placeholder="Contoh: Pengenalan K-Method" /><label htmlFor="youtubeUrl">Pautan YouTube</label><input id="youtubeUrl" name="youtubeUrl" type="url" required placeholder="https://youtu.be/..." /><button className="primary full" disabled={working === "add"}>{working === "add" ? "Sedang menambah..." : "Tambah video"}</button></form></div>}
+      {uploadOpen && <div className="modal-backdrop" onMouseDown={() => setUploadOpen(false)}><form className="upload-modal" onSubmit={addVideo} onMouseDown={(e) => e.stopPropagation()}><button type="button" className="modal-close" onClick={() => setUploadOpen(false)}>×</button><p className="eyebrow">KANDUNGAN BAHARU</p><h2>Tambah video YouTube</h2><p className="muted">Gunakan pautan video YouTube yang ditetapkan sebagai Unlisted.</p><label htmlFor="title">Tajuk video</label><input id="title" name="title" maxLength={150} required placeholder="Contoh: Pengenalan Digital Dominate" /><label htmlFor="youtubeUrl">Pautan YouTube</label><input id="youtubeUrl" name="youtubeUrl" type="url" required placeholder="https://youtu.be/..." /><button className="primary full" disabled={working === "add"}>{working === "add" ? "Sedang menambah..." : "Tambah video"}</button></form></div>}
     </main>
   );
 }

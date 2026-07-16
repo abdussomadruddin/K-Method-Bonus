@@ -4,28 +4,46 @@ import { readSession } from "@/lib/auth";
 import { ensureSchema, sql } from "@/lib/runtime";
 import { youtubeVideoId } from "@/lib/youtube";
 
+async function validGroupIds(groupIds: unknown) {
+  if (!Array.isArray(groupIds) || groupIds.some((id) => typeof id !== "string")) return null;
+  const ids = [...new Set(groupIds)];
+  if (!ids.length) return ids;
+  const rows = await sql()`SELECT id FROM access_groups WHERE id = ANY(${ids})`;
+  return rows.length === ids.length ? ids : null;
+}
+async function attachGroups(videoId: string, groupIds: string[]) {
+  for (const groupId of groupIds) await sql()`INSERT INTO video_groups (video_id, group_id) VALUES (${videoId}, ${groupId}) ON CONFLICT DO NOTHING`;
+}
+
 export async function GET() {
-  if (!await readSession()) return NextResponse.json({ error: "Log masuk diperlukan." }, { status: 401 });
+  const session = await readSession();
+  if (!session) return NextResponse.json({ error: "Log masuk diperlukan." }, { status: 401 });
   await ensureSchema();
-  const rows = await sql()`SELECT id, title, youtube_id, created_at FROM youtube_videos ORDER BY created_at DESC`;
-  const videos = rows.map((row) => ({ id: row.id, title: row.title, youtubeId: row.youtube_id, createdAt: row.created_at }));
-  return NextResponse.json({ videos });
+  const rows = session.role === "admin"
+    ? await sql()`SELECT id, title, youtube_id, created_at FROM youtube_videos ORDER BY created_at DESC`
+    : await sql()`SELECT DISTINCT v.id, v.title, v.youtube_id, v.created_at FROM youtube_videos v JOIN video_groups vg ON vg.video_id = v.id WHERE vg.group_id = ${session.groupId} ORDER BY v.created_at DESC`;
+  const videoIds = rows.map((row) => row.id);
+  const memberships = session.role === "admin" && videoIds.length
+    ? await sql()`SELECT vg.video_id, g.id AS group_id, g.name AS group_name FROM video_groups vg JOIN access_groups g ON g.id = vg.group_id WHERE vg.video_id = ANY(${videoIds})`
+    : [];
+  const groupsByVideo = new Map<string, { id: string; name: string }[]>();
+  for (const membership of memberships) groupsByVideo.set(membership.video_id, [...(groupsByVideo.get(membership.video_id) || []), { id: membership.group_id, name: membership.group_name }]);
+  return NextResponse.json({ videos: rows.map((row) => ({ id: row.id, title: row.title, youtubeId: row.youtube_id, createdAt: row.created_at, groups: groupsByVideo.get(row.id) || [] })) });
 }
 
 export async function POST(request: NextRequest) {
-  if (await readSession() !== "admin") return NextResponse.json({ error: "Akses admin diperlukan." }, { status: 403 });
-  const { title: rawTitle, youtubeUrl } = await request.json() as { title?: string; youtubeUrl?: string };
+  if ((await readSession())?.role !== "admin") return NextResponse.json({ error: "Akses admin diperlukan." }, { status: 403 });
+  const { title: rawTitle, youtubeUrl, groupIds: rawGroupIds } = await request.json() as { title?: string; youtubeUrl?: string; groupIds?: unknown };
   const title = String(rawTitle || "").trim();
   if (!title || title.length > 150) return NextResponse.json({ error: "Tajuk mesti antara 1 hingga 150 aksara." }, { status: 400 });
   const videoId = youtubeVideoId(String(youtubeUrl || ""));
   if (!videoId) return NextResponse.json({ error: "Masukkan pautan YouTube yang sah." }, { status: 400 });
-  await ensureSchema();
+  await ensureSchema(); const groupIds = await validGroupIds(rawGroupIds ?? []);
+  if (!groupIds) return NextResponse.json({ error: "Group video tidak sah." }, { status: 400 });
+  const id = randomUUID();
   try {
-    const rows = await sql()`INSERT INTO youtube_videos (id, title, youtube_id) VALUES (${randomUUID()}, ${title}, ${videoId}) RETURNING id, title, youtube_id, created_at`;
-    const video = rows[0];
-    return NextResponse.json({ video: { id: video.id, title: video.title, youtubeId: video.youtube_id, createdAt: video.created_at } }, { status: 201 });
-  } catch (error) {
-    if ((error as { code?: string }).code === "23505") return NextResponse.json({ error: "Video YouTube ini sudah ditambah." }, { status: 409 });
-    throw error;
-  }
+    const rows = await sql()`INSERT INTO youtube_videos (id, title, youtube_id) VALUES (${id}, ${title}, ${videoId}) RETURNING id, title, youtube_id, created_at`;
+    await attachGroups(id, groupIds);
+    const video = rows[0]; return NextResponse.json({ video: { id: video.id, title: video.title, youtubeId: video.youtube_id, createdAt: video.created_at, groups: [] } }, { status: 201 });
+  } catch (error) { if ((error as { code?: string }).code === "23505") return NextResponse.json({ error: "Video YouTube ini sudah ditambah." }, { status: 409 }); throw error; }
 }

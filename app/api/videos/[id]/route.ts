@@ -21,7 +21,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const { id } = await params;
   const rows = videoId ? await sql()`UPDATE youtube_videos SET title = ${title}, youtube_id = ${videoId} WHERE id = ${id} RETURNING id` : await sql()`UPDATE youtube_videos SET title = ${title} WHERE id = ${id} RETURNING id`;
   if (!rows[0]) return NextResponse.json({ error: "Video tidak ditemui." }, { status: 404 });
-  if (groupIds !== undefined) { await sql()`DELETE FROM video_groups WHERE video_id = ${id}`; for (const groupId of groupIds) await sql()`INSERT INTO video_groups (video_id, group_id) VALUES (${id}, ${groupId})`; }
+  if (groupIds !== undefined) { await sql()`DELETE FROM video_groups WHERE video_id = ${id}`; for (const groupId of groupIds) { const module = await sql()`SELECT id FROM group_modules WHERE group_id = ${groupId} ORDER BY sort_order ASC LIMIT 1`; const next = await sql()`SELECT COALESCE(MAX(sort_order), -1) + 1 AS value FROM video_groups WHERE group_id = ${groupId} AND module_id = ${module[0].id}`; await sql()`INSERT INTO video_groups (video_id, group_id, module_id, sort_order) VALUES (${id}, ${groupId}, ${module[0].id}, ${Number(next[0].value)})`; } }
   return NextResponse.json({ ok: true });
 }
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {

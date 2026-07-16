@@ -12,7 +12,11 @@ async function validGroupIds(groupIds: unknown) {
   return rows.length === ids.length ? ids : null;
 }
 async function attachGroups(videoId: string, groupIds: string[]) {
-  for (const groupId of groupIds) await sql()`INSERT INTO video_groups (video_id, group_id) VALUES (${videoId}, ${groupId}) ON CONFLICT DO NOTHING`;
+  for (const groupId of groupIds) {
+    const module = await sql()`SELECT id FROM group_modules WHERE group_id = ${groupId} ORDER BY sort_order ASC LIMIT 1`;
+    const next = await sql()`SELECT COALESCE(MAX(sort_order), -1) + 1 AS value FROM video_groups WHERE group_id = ${groupId} AND module_id = ${module[0].id}`;
+    await sql()`INSERT INTO video_groups (video_id, group_id, module_id, sort_order) VALUES (${videoId}, ${groupId}, ${module[0].id}, ${Number(next[0].value)}) ON CONFLICT DO NOTHING`;
+  }
 }
 
 export async function GET() {
@@ -21,14 +25,14 @@ export async function GET() {
   await ensureSchema();
   const rows = session.role === "admin"
     ? await sql()`SELECT id, title, youtube_id, created_at FROM youtube_videos ORDER BY created_at DESC`
-    : await sql()`SELECT DISTINCT v.id, v.title, v.youtube_id, v.created_at FROM youtube_videos v JOIN video_groups vg ON vg.video_id = v.id WHERE vg.group_id = ${session.groupId} ORDER BY v.created_at DESC`;
-  const videoIds = rows.map((row) => row.id);
+    : await sql()`SELECT v.id, v.title, v.youtube_id, v.created_at, gm.id AS module_id, gm.title AS module_title, gm.sort_order AS module_order FROM youtube_videos v JOIN video_groups vg ON vg.video_id = v.id JOIN group_modules gm ON gm.id = vg.module_id WHERE vg.group_id = ${session.groupId} ORDER BY gm.sort_order ASC, vg.sort_order ASC, v.created_at DESC`;
+  const videoIds = rows.map((row: any) => row.id);
   const memberships = session.role === "admin" && videoIds.length
     ? await sql()`SELECT vg.video_id, g.id AS group_id, g.name AS group_name FROM video_groups vg JOIN access_groups g ON g.id = vg.group_id WHERE vg.video_id = ANY(${videoIds})`
     : [];
   const groupsByVideo = new Map<string, { id: string; name: string }[]>();
   for (const membership of memberships) groupsByVideo.set(membership.video_id, [...(groupsByVideo.get(membership.video_id) || []), { id: membership.group_id, name: membership.group_name }]);
-  return NextResponse.json({ videos: rows.map((row) => ({ id: row.id, title: row.title, youtubeId: row.youtube_id, createdAt: row.created_at, groups: groupsByVideo.get(row.id) || [] })) });
+  return NextResponse.json({ videos: rows.map((row: any) => ({ id: row.id, title: row.title, youtubeId: row.youtube_id, createdAt: row.created_at, groups: groupsByVideo.get(row.id) || [], module: session.role === "student" ? { id: row.module_id, title: row.module_title, sortOrder: Number(row.module_order) } : undefined })) });
 }
 
 export async function POST(request: NextRequest) {

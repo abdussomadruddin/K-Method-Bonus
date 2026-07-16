@@ -16,7 +16,11 @@ export async function ensureSchema() {
   await db`CREATE TABLE IF NOT EXISTS access_groups (id TEXT PRIMARY KEY, name TEXT NOT NULL, password_ciphertext TEXT NOT NULL, password_iv TEXT NOT NULL, session_version INTEGER NOT NULL DEFAULT 1, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`;
   await db`CREATE UNIQUE INDEX IF NOT EXISTS access_groups_name_ci_idx ON access_groups (LOWER(name))`;
   await db`CREATE TABLE IF NOT EXISTS video_groups (video_id TEXT NOT NULL REFERENCES youtube_videos(id) ON DELETE CASCADE, group_id TEXT NOT NULL REFERENCES access_groups(id) ON DELETE CASCADE, PRIMARY KEY (video_id, group_id))`;
+  await db`ALTER TABLE video_groups ADD COLUMN IF NOT EXISTS module_id TEXT`;
+  await db`ALTER TABLE video_groups ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0`;
   await db`CREATE INDEX IF NOT EXISTS video_groups_group_idx ON video_groups(group_id)`;
+  await db`CREATE TABLE IF NOT EXISTS group_modules (id TEXT PRIMARY KEY, group_id TEXT NOT NULL REFERENCES access_groups(id) ON DELETE CASCADE, title TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`;
+  await db`CREATE INDEX IF NOT EXISTS group_modules_group_idx ON group_modules(group_id, sort_order)`;
   const groups = await db`SELECT id FROM access_groups LIMIT 1`;
   if (!groups[0]) {
     const password = process.env.STUDENT_PASSWORD;
@@ -25,6 +29,13 @@ export async function ensureSchema() {
     const id = randomUUID();
     await db`INSERT INTO access_groups (id, name, password_ciphertext, password_iv) VALUES (${id}, ${"BONUS K-METHOD"}, ${encrypted.ciphertext}, ${encrypted.iv})`;
     await db`INSERT INTO video_groups (video_id, group_id) SELECT id, ${id} FROM youtube_videos ON CONFLICT DO NOTHING`;
+  }
+  const allGroups = await db`SELECT id FROM access_groups`;
+  for (const group of allGroups) {
+    const modules = await db`SELECT id FROM group_modules WHERE group_id = ${group.id} ORDER BY sort_order ASC LIMIT 1`;
+    const moduleId = modules[0]?.id || randomUUID();
+    if (!modules[0]) await db`INSERT INTO group_modules (id, group_id, title, sort_order) VALUES (${moduleId}, ${group.id}, ${"Modul 1"}, 0)`;
+    await db`UPDATE video_groups SET module_id = ${moduleId} WHERE group_id = ${group.id} AND module_id IS NULL`;
   }
   initialized = true;
 }

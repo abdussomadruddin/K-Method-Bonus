@@ -201,7 +201,7 @@ function Dashboard({ role, videos, allVideos, search, setSearch, selected, setSe
     <main className="app-shell">
       <header className="topbar">
         <div className="logo-row"><div className="brand-mark small"><img src="/icon-192.png" alt="" /></div><div><strong>Digital Dominate</strong><span>Portal Pembelajaran</span></div></div>
-        <div className="top-actions"><span className="role-badge">{role === "admin" ? "Admin" : "Student"}</span><button className="ghost" onClick={logout}>Log keluar ↗</button></div>
+        <div className="top-actions"><span className="role-badge">{role === "admin" ? "Admin" : "BONUS K-METHOD"}</span><button className="ghost" onClick={logout}>Log keluar ↗</button></div>
       </header>
       <section className={`dashboard${role === "student" ? " video-library" : ""}`}>
         {role === "admin" && <><div className="welcome-row">

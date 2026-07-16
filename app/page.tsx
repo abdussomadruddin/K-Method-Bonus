@@ -1,70 +1,1366 @@
 "use client";
 /* eslint-disable react-hooks/set-state-in-effect */
 
-import { DragEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  DragEvent,
+  Fragment,
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { youtubeEmbedUrl } from "@/lib/youtube";
 
-type Session = { role: "admin" } | { role: "student"; groupId: string; groupName: string; version: number };
-type GroupModule = { id: string; title: string; sortOrder: number; videoIds: string[] };
-type Video = { id: string; title: string; youtubeId: string; createdAt: string; groups: { id: string; name: string }[]; module?: { id: string; title: string; sortOrder: number } };
-type Group = { id: string; name: string; password: string; version: number; createdAt: string; videoIds: string[]; modules: GroupModule[] };
+type Session =
+  | { role: "admin" }
+  | { role: "student"; groupId: string; groupName: string; version: number };
+type GroupModule = {
+  id: string;
+  title: string;
+  sortOrder: number;
+  videoIds: string[];
+};
+type Video = {
+  id: string;
+  title: string;
+  youtubeId: string;
+  createdAt: string;
+  groups: { id: string; name: string }[];
+  module?: { id: string; title: string; sortOrder: number };
+};
+type Group = {
+  id: string;
+  name: string;
+  password: string;
+  version: number;
+  createdAt: string;
+  videoIds: string[];
+  modules: GroupModule[];
+};
 const rates = [1, 1.25, 1.5, 2, 2.5, 3];
-function time(value: number) { const s = Math.max(0, Math.floor(Number.isFinite(value) ? value : 0)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; }
-function flip(values: string[], id: string) { return values.includes(id) ? values.filter((value) => value !== id) : [...values, id]; }
+function time(value: number) {
+  const s = Math.max(0, Math.floor(Number.isFinite(value) ? value : 0));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+function flip(values: string[], id: string) {
+  return values.includes(id)
+    ? values.filter((value) => value !== id)
+    : [...values, id];
+}
 
 export default function Home() {
-  const [session, setSession] = useState<Session | null>(null); const [checking, setChecking] = useState(true);
-  const [videos, setVideos] = useState<Video[]>([]); const [groups, setGroups] = useState<Group[]>([]); const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<Video | null>(null); const [message, setMessage] = useState(""); const [busy, setBusy] = useState(false);
-  const loadVideos = useCallback(async () => { const response = await fetch("/api/videos", { cache: "no-store" }); if (response.status === 401) { setSession(null); return; } if (response.ok) setVideos((await response.json()).videos); }, []);
-  const loadGroups = useCallback(async () => { const response = await fetch("/api/groups", { cache: "no-store" }); if (response.ok) setGroups((await response.json()).groups); }, []);
-  useEffect(() => { fetch("/api/session", { cache: "no-store" }).then(async (response) => { if (response.ok) setSession(await response.json()); }).finally(() => setChecking(false)); }, []);
-  useEffect(() => { if (session) { void loadVideos(); if (session.role === "admin") void loadGroups(); else setGroups([]); } }, [session, loadVideos, loadGroups]);
-  const filtered = useMemo(() => videos.filter((video) => video.title.toLowerCase().includes(search.toLowerCase())), [videos, search]);
-  async function login(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setMessage(""); setBusy(true); const form = new FormData(event.currentTarget); const response = await fetch("/api/session", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ password: form.get("password") }) }); const data = await response.json().catch(() => ({})); if (response.ok) setSession(data); else setMessage(data.error || "Log masuk gagal."); setBusy(false); }
-  async function logout() { await fetch("/api/session", { method: "DELETE" }); setSession(null); setVideos([]); setGroups([]); setSelected(null); }
-  if (checking) return <main className="center-screen"><div className="loader" /></main>;
-  if (!session) return <main className="login-page"><section className="brand-panel"><div className="brand-mark"><img src="/icon-192.png" alt="Digital Dominate" /></div><div><p className="eyebrow light">DIGITAL DOMINATE</p><h1>Belajar dengan fokus.<br />Kuasa dengan ilmu.</h1><p className="brand-copy">Ruang pembelajaran video yang tersusun untuk membantu anda bergerak selangkah demi selangkah.</p></div><p className="brand-foot">Kandungan eksklusif • Akses selamat</p></section><section className="login-panel"><form className="login-card" onSubmit={login}><p className="eyebrow">SELAMAT DATANG</p><h2>Log masuk ke portal</h2><p className="muted">Masukkan kata laluan group anda untuk meneruskan.</p><label htmlFor="password">Kata laluan</label><input id="password" name="password" type="password" autoComplete="current-password" required />{message && <p className="error">{message}</p>}<button className="primary full" disabled={busy}>{busy ? "Menyemak..." : "Log masuk"} <span>→</span></button><p className="privacy">🔒 Sesi anda dilindungi dan sah selama 7 hari.</p></form></section></main>;
-  return <Dashboard session={session} videos={filtered} allVideos={videos} groups={groups} search={search} setSearch={setSearch} selected={selected} setSelected={setSelected} reload={async () => { await loadVideos(); await loadGroups(); }} logout={logout} />;
+  const [session, setSession] = useState<Session | null>(null);
+  const [checking, setChecking] = useState(true);
+  const [videos, setVideos] = useState<Video[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<Video | null>(null);
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const loadVideos = useCallback(async () => {
+    const response = await fetch("/api/videos", { cache: "no-store" });
+    if (response.status === 401) {
+      setSession(null);
+      return;
+    }
+    if (response.ok) setVideos((await response.json()).videos);
+  }, []);
+  const loadGroups = useCallback(async () => {
+    const response = await fetch("/api/groups", { cache: "no-store" });
+    if (response.ok) setGroups((await response.json()).groups);
+  }, []);
+  useEffect(() => {
+    fetch("/api/session", { cache: "no-store" })
+      .then(async (response) => {
+        if (response.ok) setSession(await response.json());
+      })
+      .finally(() => setChecking(false));
+  }, []);
+  useEffect(() => {
+    if (session) {
+      void loadVideos();
+      if (session.role === "admin") void loadGroups();
+      else setGroups([]);
+    }
+  }, [session, loadVideos, loadGroups]);
+  const filtered = useMemo(
+    () =>
+      videos.filter((video) =>
+        video.title.toLowerCase().includes(search.toLowerCase()),
+      ),
+    [videos, search],
+  );
+  async function login(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setMessage("");
+    setBusy(true);
+    const form = new FormData(event.currentTarget);
+    const response = await fetch("/api/session", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ password: form.get("password") }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (response.ok) setSession(data);
+    else setMessage(data.error || "Log masuk gagal.");
+    setBusy(false);
+  }
+  async function logout() {
+    await fetch("/api/session", { method: "DELETE" });
+    setSession(null);
+    setVideos([]);
+    setGroups([]);
+    setSelected(null);
+  }
+  if (checking)
+    return (
+      <main className="center-screen">
+        <div className="loader" />
+      </main>
+    );
+  if (!session)
+    return (
+      <main className="login-page">
+        <section className="brand-panel">
+          <div className="brand-mark">
+            <img src="/icon-192.png" alt="Digital Dominate" />
+          </div>
+          <div>
+            <p className="eyebrow light">DIGITAL DOMINATE</p>
+            <h1>
+              Belajar dengan fokus.
+              <br />
+              Kuasa dengan ilmu.
+            </h1>
+            <p className="brand-copy">
+              Ruang pembelajaran video yang tersusun untuk membantu anda
+              bergerak selangkah demi selangkah.
+            </p>
+          </div>
+          <p className="brand-foot">Kandungan eksklusif • Akses selamat</p>
+        </section>
+        <section className="login-panel">
+          <form className="login-card" onSubmit={login}>
+            <p className="eyebrow">SELAMAT DATANG</p>
+            <h2>Log masuk ke portal</h2>
+            <p className="muted">
+              Masukkan kata laluan group anda untuk meneruskan.
+            </p>
+            <label htmlFor="password">Kata laluan</label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              required
+            />
+            {message && <p className="error">{message}</p>}
+            <button className="primary full" disabled={busy}>
+              {busy ? "Menyemak..." : "Log masuk"} <span>→</span>
+            </button>
+            <p className="privacy">
+              🔒 Sesi anda dilindungi dan sah selama 7 hari.
+            </p>
+          </form>
+        </section>
+      </main>
+    );
+  return (
+    <Dashboard
+      session={session}
+      videos={filtered}
+      allVideos={videos}
+      groups={groups}
+      search={search}
+      setSearch={setSearch}
+      selected={selected}
+      setSelected={setSelected}
+      reload={async () => {
+        await loadVideos();
+        await loadGroups();
+      }}
+      logout={logout}
+    />
+  );
 }
 
-function GroupManager({ groups, videos, reload, logout, showVideos, addModule, renameModule, removeModule, reorderModules, reorderVideos, saveVideoOrder }: { groups: Group[]; videos: Video[]; reload: () => Promise<void>; logout: () => Promise<void>; showVideos: () => void; addModule: (group: Group) => Promise<void>; renameModule: (group: Group, module: GroupModule) => Promise<void>; removeModule: (group: Group, module: GroupModule) => Promise<void>; reorderModules: (group: Group, id: string, direction: -1 | 1) => Promise<void>; reorderVideos: (group: Group, module: GroupModule, id: string, direction: -1 | 1) => Promise<void>; saveVideoOrder: (group: Group, module: GroupModule, ids: string[]) => Promise<void> }) {
-  const [open, setOpen] = useState(false); const [saving, setSaving] = useState(false); const [error, setError] = useState(""); const [draggedVideo, setDraggedVideo] = useState<{ id: string; groupId: string } | null>(null);
-  async function dropVideo(event: DragEvent<HTMLElement>, group: Group, targetModule: GroupModule, targetId?: string) { event.preventDefault(); if (!draggedVideo || draggedVideo.groupId !== group.id || (targetModule.videoIds.includes(draggedVideo.id) && draggedVideo.id === targetId)) return; const ids = [...targetModule.videoIds].filter((id) => id !== draggedVideo.id); const target = targetId ? ids.indexOf(targetId) : ids.length; ids.splice(target < 0 ? ids.length : target, 0, draggedVideo.id); setDraggedVideo(null); await saveVideoOrder(group, targetModule, ids); }
-  async function createGroup(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setSaving(true); setError(""); const form = new FormData(event.currentTarget); const response = await fetch("/api/groups", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: form.get("name"), password: form.get("password"), moduleTitle: form.get("moduleTitle"), videoIds: [] }) }); const data = await response.json().catch(() => ({})); if (!response.ok) setError(data.error || "Group tidak dapat ditambah."); else { setOpen(false); await reload(); } setSaving(false); }
-  return <main className="app-shell"><header className="topbar"><div className="logo-row"><div className="brand-mark small"><img src="/icon-192.png" alt="" /></div><div><strong>Digital Dominate</strong><span>Portal Pembelajaran</span></div></div><div className="top-actions"><span className="role-badge">Admin</span><button className="ghost" onClick={logout}>Log keluar ↗</button></div></header><section className="dashboard"><div className="welcome-row"><div><p className="eyebrow">PANEL PENGURUSAN</p><h1>Modul dan susunan video</h1><p className="muted">Seret video ke mana-mana modul dalam group untuk susun atau pindahkan secara automatik.</p></div><button className="primary" onClick={() => setOpen(true)}>＋ Tambah group</button></div><div className="admin-tabs"><button onClick={showVideos}>Video</button><button className="active">Kumpulan</button></div><section className="group-grid">{groups.map((group) => <article className="group-card module-group" key={group.id}><div><p className="eyebrow">GROUP AKSES</p><h2>{group.name}</h2><div className="module-list">{[...group.modules].sort((a, b) => a.sortOrder - b.sortOrder).map((module) => <section className="module-admin" key={module.id} onDragOver={(event) => event.preventDefault()} onDrop={(event) => void dropVideo(event, group, module)}><div className="module-head"><strong>{module.title}</strong><span><button onClick={() => reorderModules(group, module.id, -1)}>↑</button><button onClick={() => reorderModules(group, module.id, 1)}>↓</button><button onClick={() => renameModule(group, module)}>Ubah</button><button onClick={() => removeModule(group, module)}>×</button></span></div>{module.videoIds.length ? module.videoIds.map((id, index) => { const video = videos.find((item) => item.id === id); return video ? <div className={`module-video${draggedVideo?.id === id ? " dragging" : ""}`} key={id} draggable onDragStart={() => setDraggedVideo({ id, groupId: group.id })} onDragEnd={() => setDraggedVideo(null)} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.stopPropagation(); void dropVideo(event, group, module, id); }}><span className="drag-handle" aria-hidden="true">⠿</span><span>{index + 1}. {video.title}</span><span><button onClick={() => reorderVideos(group, module, id, -1)}>↑</button><button onClick={() => reorderVideos(group, module, id, 1)}>↓</button></span></div> : null; }) : <div className="module-drop-zone">Lepaskan video di sini</div>}</section>)}<button className="add-module" onClick={() => addModule(group)}>＋ Tambah modul</button></div></div></article>)}</section></section>{open && <div className="modal-backdrop" onMouseDown={() => setOpen(false)}><form className="upload-modal" onSubmit={createGroup} onMouseDown={(event) => event.stopPropagation()}><button type="button" className="modal-close" onClick={() => setOpen(false)}>×</button><p className="eyebrow">GROUP AKSES</p><h2>Tambah group</h2><label>Nama group</label><input name="name" required maxLength={80} /><label>Password group</label><input name="password" required minLength={6} maxLength={100} /><label>Tajuk modul pertama</label><input name="moduleTitle" required maxLength={100} placeholder="Contoh: Bonus Khas" />{error && <p className="error">{error}</p>}<button className="primary full" disabled={saving}>{saving ? "Menyimpan..." : "Simpan group"}</button></form></div>}</main>;
+function GroupManager({
+  groups,
+  videos,
+  reload,
+  logout,
+  showVideos,
+  addModule,
+  renameModule,
+  removeModule,
+  reorderModules,
+  reorderVideos,
+  saveVideoOrder,
+}: {
+  groups: Group[];
+  videos: Video[];
+  reload: () => Promise<void>;
+  logout: () => Promise<void>;
+  showVideos: () => void;
+  addModule: (group: Group) => Promise<void>;
+  renameModule: (group: Group, module: GroupModule) => Promise<void>;
+  removeModule: (group: Group, module: GroupModule) => Promise<void>;
+  reorderModules: (
+    group: Group,
+    id: string,
+    direction: -1 | 1,
+  ) => Promise<void>;
+  reorderVideos: (
+    group: Group,
+    module: GroupModule,
+    id: string,
+    direction: -1 | 1,
+  ) => Promise<void>;
+  saveVideoOrder: (
+    group: Group,
+    module: GroupModule,
+    ids: string[],
+  ) => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [draggedVideo, setDraggedVideo] = useState<{
+    id: string;
+    groupId: string;
+  } | null>(null);
+  async function dropVideo(
+    event: DragEvent<HTMLElement>,
+    group: Group,
+    targetModule: GroupModule,
+    targetId?: string,
+  ) {
+    event.preventDefault();
+    if (
+      !draggedVideo ||
+      draggedVideo.groupId !== group.id ||
+      (targetModule.videoIds.includes(draggedVideo.id) &&
+        draggedVideo.id === targetId)
+    )
+      return;
+    const ids = [...targetModule.videoIds].filter(
+      (id) => id !== draggedVideo.id,
+    );
+    const target = targetId ? ids.indexOf(targetId) : ids.length;
+    ids.splice(target < 0 ? ids.length : target, 0, draggedVideo.id);
+    setDraggedVideo(null);
+    await saveVideoOrder(group, targetModule, ids);
+  }
+  async function createGroup(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    const form = new FormData(event.currentTarget);
+    const response = await fetch("/api/groups", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: form.get("name"),
+        password: form.get("password"),
+        moduleTitle: form.get("moduleTitle"),
+        videoIds: [],
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) setError(data.error || "Group tidak dapat ditambah.");
+    else {
+      setOpen(false);
+      await reload();
+    }
+    setSaving(false);
+  }
+  return (
+    <main className="app-shell">
+      <header className="topbar">
+        <div className="logo-row">
+          <div className="brand-mark small">
+            <img src="/icon-192.png" alt="" />
+          </div>
+          <div>
+            <strong>Digital Dominate</strong>
+            <span>Portal Pembelajaran</span>
+          </div>
+        </div>
+        <div className="top-actions">
+          <span className="role-badge">Admin</span>
+          <button className="ghost" onClick={logout}>
+            Log keluar ↗
+          </button>
+        </div>
+      </header>
+      <section className="dashboard">
+        <div className="welcome-row">
+          <div>
+            <p className="eyebrow">PANEL PENGURUSAN</p>
+            <h1>Modul dan susunan video</h1>
+            <p className="muted">
+              Seret video ke mana-mana modul dalam group untuk susun atau
+              pindahkan secara automatik.
+            </p>
+          </div>
+          <button className="primary" onClick={() => setOpen(true)}>
+            ＋ Tambah group
+          </button>
+        </div>
+        <div className="admin-tabs">
+          <button onClick={showVideos}>Video</button>
+          <button className="active">Kumpulan</button>
+        </div>
+        <section className="group-grid">
+          {groups.map((group) => (
+            <article className="group-card module-group" key={group.id}>
+              <div>
+                <p className="eyebrow">GROUP AKSES</p>
+                <h2>{group.name}</h2>
+                <div className="module-list">
+                  {[...group.modules]
+                    .sort((a, b) => a.sortOrder - b.sortOrder)
+                    .map((module) => (
+                      <section
+                        className="module-admin"
+                        key={module.id}
+                        onDragOver={(event) => event.preventDefault()}
+                        onDrop={(event) => void dropVideo(event, group, module)}
+                      >
+                        <div className="module-head">
+                          <strong>{module.title}</strong>
+                          <span>
+                            <button
+                              onClick={() =>
+                                reorderModules(group, module.id, -1)
+                              }
+                            >
+                              ↑
+                            </button>
+                            <button
+                              onClick={() =>
+                                reorderModules(group, module.id, 1)
+                              }
+                            >
+                              ↓
+                            </button>
+                            <button onClick={() => renameModule(group, module)}>
+                              Ubah
+                            </button>
+                            <button onClick={() => removeModule(group, module)}>
+                              ×
+                            </button>
+                          </span>
+                        </div>
+                        {module.videoIds.length ? (
+                          module.videoIds.map((id, index) => {
+                            const video = videos.find((item) => item.id === id);
+                            return video ? (
+                              <div
+                                className={`module-video${draggedVideo?.id === id ? " dragging" : ""}`}
+                                key={id}
+                                draggable
+                                onDragStart={() =>
+                                  setDraggedVideo({ id, groupId: group.id })
+                                }
+                                onDragEnd={() => setDraggedVideo(null)}
+                                onDragOver={(event) => event.preventDefault()}
+                                onDrop={(event) => {
+                                  event.stopPropagation();
+                                  void dropVideo(event, group, module, id);
+                                }}
+                              >
+                                <span
+                                  className="drag-handle"
+                                  aria-hidden="true"
+                                >
+                                  ⠿
+                                </span>
+                                <span>
+                                  {index + 1}. {video.title}
+                                </span>
+                                <span>
+                                  <button
+                                    onClick={() =>
+                                      reorderVideos(group, module, id, -1)
+                                    }
+                                  >
+                                    ↑
+                                  </button>
+                                  <button
+                                    onClick={() =>
+                                      reorderVideos(group, module, id, 1)
+                                    }
+                                  >
+                                    ↓
+                                  </button>
+                                </span>
+                              </div>
+                            ) : null;
+                          })
+                        ) : (
+                          <div className="module-drop-zone">
+                            Lepaskan video di sini
+                          </div>
+                        )}
+                      </section>
+                    ))}
+                  <button
+                    className="add-module"
+                    onClick={() => addModule(group)}
+                  >
+                    ＋ Tambah modul
+                  </button>
+                </div>
+              </div>
+            </article>
+          ))}
+        </section>
+      </section>
+      {open && (
+        <div className="modal-backdrop" onMouseDown={() => setOpen(false)}>
+          <form
+            className="upload-modal"
+            onSubmit={createGroup}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="modal-close"
+              onClick={() => setOpen(false)}
+            >
+              ×
+            </button>
+            <p className="eyebrow">GROUP AKSES</p>
+            <h2>Tambah group</h2>
+            <label>Nama group</label>
+            <input name="name" required maxLength={80} />
+            <label>Password group</label>
+            <input name="password" required minLength={6} maxLength={100} />
+            <label>Tajuk modul pertama</label>
+            <input
+              name="moduleTitle"
+              required
+              maxLength={100}
+              placeholder="Contoh: Bonus Khas"
+            />
+            {error && <p className="error">{error}</p>}
+            <button className="primary full" disabled={saving}>
+              {saving ? "Menyimpan..." : "Simpan group"}
+            </button>
+          </form>
+        </div>
+      )}
+    </main>
+  );
 }
 
-function Dashboard({ session, videos, allVideos, groups, search, setSearch, selected, setSelected, reload, logout }: { session: Session; videos: Video[]; allVideos: Video[]; groups: Group[]; search: string; setSearch: (value: string) => void; selected: Video | null; setSelected: (video: Video | null) => void; reload: () => Promise<void>; logout: () => Promise<void> }) {
-  const admin = session.role === "admin"; const [tab, setTab] = useState<"videos" | "groups">("videos"); const [notice, setNotice] = useState(""); const [working, setWorking] = useState("");
-  const [videoModal, setVideoModal] = useState(false); const [editingVideo, setEditingVideo] = useState<Video | null>(null); const [videoGroupIds, setVideoGroupIds] = useState<string[]>([]);
-  const [groupModal, setGroupModal] = useState(false); const [editingGroup, setEditingGroup] = useState<Group | null>(null); const [groupVideoIds, setGroupVideoIds] = useState<string[]>([]); const [revealed, setRevealed] = useState<string[]>([]);
-  const [playing, setPlaying] = useState(true); const [muted, setMuted] = useState(false); const [fullscreen, setFullscreen] = useState(false); const [rate, setRate] = useState(1); const [current, setCurrent] = useState(0); const [duration, setDuration] = useState(0);
-  const playerRef = useRef<HTMLIFrameElement>(null); const frameRef = useRef<HTMLElement>(null); const currentRef = useRef(0);
-  useEffect(() => { if (selected) { setPlaying(true); setMuted(false); setCurrent(0); setDuration(0); currentRef.current = 0; } }, [selected]);
-  useEffect(() => { const change = () => setFullscreen(document.fullscreenElement === frameRef.current); document.addEventListener("fullscreenchange", change); return () => document.removeEventListener("fullscreenchange", change); }, []);
-  useEffect(() => { const receive = (event: MessageEvent) => { if (event.source !== playerRef.current?.contentWindow) return; try { const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data; if (data.event === "infoDelivery" && data.info) { if (typeof data.info.currentTime === "number") { currentRef.current = data.info.currentTime; setCurrent(data.info.currentTime); } if (typeof data.info.duration === "number") setDuration(data.info.duration); } } catch { /* Ignore non-player messages. */ } }; window.addEventListener("message", receive); return () => window.removeEventListener("message", receive); }, []);
-  function command(func: "playVideo" | "pauseVideo" | "mute" | "unMute" | "setPlaybackRate" | "seekTo", args: Array<number | boolean> = []) { playerRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func, args }), "https://www.youtube-nocookie.com"); }
-  useEffect(() => { if (!selected || !playing || rate <= 2) return; const id = window.setInterval(() => command("seekTo", [currentRef.current + rate - 2, true]), 1000); return () => window.clearInterval(id); }, [selected, playing, rate]);
-  function connect() { playerRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "listening", id: "lms-player" }), "https://www.youtube-nocookie.com"); command("setPlaybackRate", [Math.min(rate, 2)]); }
-  function togglePlay() { command(playing ? "pauseVideo" : "playVideo"); setPlaying((value) => !value); }
-  function toggleMute() { command(muted ? "unMute" : "mute"); setMuted((value) => !value); }
-  async function toggleFullscreen() { if (document.fullscreenElement) await document.exitFullscreen(); else await frameRef.current?.requestFullscreen(); }
-  function changeRate(value: number) { setRate(value); command("setPlaybackRate", [Math.min(value, 2)]); }
-  function seek(value: number) { currentRef.current = value; setCurrent(value); command("seekTo", [value, true]); }
-  function openVideoForm(video?: Video) { setEditingVideo(video || null); setVideoGroupIds(video?.groups.map((group) => group.id) || []); setVideoModal(true); }
-  function openGroupForm(group?: Group) { setEditingGroup(group || null); setGroupVideoIds(group?.videoIds || []); setGroupModal(true); }
-  async function saveVideo(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setWorking("video"); const form = new FormData(event.currentTarget); const endpoint = editingVideo ? `/api/videos/${editingVideo.id}` : "/api/videos"; const response = await fetch(endpoint, { method: editingVideo ? "PATCH" : "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: form.get("title"), youtubeUrl: form.get("youtubeUrl"), groupIds: videoGroupIds }) }); const data = await response.json().catch(() => ({})); setNotice(response.ok ? "Video berjaya disimpan." : data.error || "Video tidak dapat disimpan."); if (response.ok) { setVideoModal(false); await reload(); } setWorking(""); }
-  async function saveGroup(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setWorking("group"); const form = new FormData(event.currentTarget); const endpoint = editingGroup ? `/api/groups/${editingGroup.id}` : "/api/groups"; const response = await fetch(endpoint, { method: editingGroup ? "PATCH" : "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: form.get("name"), password: form.get("password"), videoIds: groupVideoIds }) }); const data = await response.json().catch(() => ({})); setNotice(response.ok ? "Group berjaya disimpan." : data.error || "Group tidak dapat disimpan."); if (response.ok) { setGroupModal(false); await reload(); } setWorking(""); }
-  async function removeVideo(video: Video) { if (!window.confirm(`Padam “${video.title}”?`)) return; setWorking(video.id); const response = await fetch(`/api/videos/${video.id}`, { method: "DELETE" }); const data = await response.json().catch(() => ({})); setNotice(response.ok ? "Video telah dipadam." : data.error || "Video tidak dapat dipadam."); if (response.ok) await reload(); setWorking(""); }
-  async function removeGroup(group: Group) { if (!window.confirm(`Padam group “${group.name}”? Video YouTube tidak akan dipadam.`)) return; setWorking(group.id); const response = await fetch(`/api/groups/${group.id}`, { method: "DELETE" }); const data = await response.json().catch(() => ({})); setNotice(response.ok ? "Group telah dipadam." : data.error || "Group tidak dapat dipadam."); if (response.ok) await reload(); setWorking(""); }
-  async function addModule(group: Group) { const title = window.prompt("Tajuk modul baharu")?.trim(); if (!title) return; const response = await fetch(`/api/groups/${group.id}/modules`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title }) }); const data = await response.json().catch(() => ({})); setNotice(response.ok ? "Modul berjaya ditambah." : data.error || "Modul tidak dapat ditambah."); if (response.ok) await reload(); }
-  async function renameModule(group: Group, module: GroupModule) { const title = window.prompt("Tajuk modul", module.title)?.trim(); if (!title || title === module.title) return; const response = await fetch(`/api/groups/${group.id}/modules/${module.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ title }) }); const data = await response.json().catch(() => ({})); setNotice(response.ok ? "Tajuk modul dikemas kini." : data.error || "Modul tidak dapat dikemas kini."); if (response.ok) await reload(); }
-  async function removeModule(group: Group, module: GroupModule) { if (!window.confirm(`Padam modul “${module.title}”? Video akan dipindahkan ke modul lain.`)) return; const response = await fetch(`/api/groups/${group.id}/modules/${module.id}`, { method: "DELETE" }); const data = await response.json().catch(() => ({})); setNotice(response.ok ? "Modul telah dipadam." : data.error || "Modul tidak dapat dipadam."); if (response.ok) await reload(); }
-  async function reorderModules(group: Group, moduleId: string, direction: -1 | 1) { const modules = [...group.modules].sort((a, b) => a.sortOrder - b.sortOrder); const index = modules.findIndex((module) => module.id === moduleId); const target = index + direction; if (target < 0 || target >= modules.length) return; [modules[index], modules[target]] = [modules[target], modules[index]]; const response = await fetch(`/api/groups/${group.id}/modules/order`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ moduleIds: modules.map((module) => module.id) }) }); if (response.ok) await reload(); }
-  async function reorderVideos(group: Group, module: GroupModule, videoId: string, direction: -1 | 1) { const ids = [...module.videoIds]; const index = ids.indexOf(videoId); const target = index + direction; if (target < 0 || target >= ids.length) return; [ids[index], ids[target]] = [ids[target], ids[index]]; const response = await fetch(`/api/groups/${group.id}/modules/${module.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ videoIds: ids }) }); if (response.ok) await reload(); }
-  async function saveVideoOrder(group: Group, module: GroupModule, videoIds: string[]) { const response = await fetch(`/api/groups/${group.id}/modules/${module.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ videoIds }) }); const data = await response.json().catch(() => ({})); setNotice(response.ok ? "Susunan video dikemas kini." : data.error || "Susunan video tidak dapat dikemas kini."); if (response.ok) await reload(); }
-  if (admin && tab === "groups") return <GroupManager groups={groups} videos={allVideos} reload={reload} logout={logout} showVideos={() => setTab("videos")} addModule={addModule} renameModule={renameModule} removeModule={removeModule} reorderModules={reorderModules} reorderVideos={reorderVideos} saveVideoOrder={saveVideoOrder} />;
-  if (admin && tab === "groups") return <main className="app-shell"><header className="topbar"><div className="logo-row"><div className="brand-mark small"><img src="/icon-192.png" alt="" /></div><div><strong>Digital Dominate</strong><span>Portal Pembelajaran</span></div></div><div className="top-actions"><span className="role-badge">Admin</span><button className="ghost" onClick={logout}>Log keluar ↗</button></div></header><section className="dashboard"><div className="welcome-row"><div><p className="eyebrow">PANEL PENGURUSAN</p><h1>Modul dan susunan video</h1><p className="muted">Tambah modul dan susun video mengikut urutan pembelajaran setiap group.</p></div><button className="primary" onClick={() => setTab("videos")}>← Video</button></div><div className="admin-tabs"><button onClick={() => setTab("videos")}>Video</button><button className="active">Kumpulan</button></div><section className="group-grid">{groups.map((group) => <article className="group-card module-group" key={group.id}><div><p className="eyebrow">GROUP AKSES</p><h2>{group.name}</h2><div className="module-list">{[...group.modules].sort((a, b) => a.sortOrder - b.sortOrder).map((module, moduleIndex) => <section className="module-admin" key={module.id}><div className="module-head"><strong>Modul {moduleIndex + 1}: {module.title}</strong><span><button onClick={() => reorderModules(group, module.id, -1)}>↑</button><button onClick={() => reorderModules(group, module.id, 1)}>↓</button><button onClick={() => renameModule(group, module)}>Ubah</button><button onClick={() => removeModule(group, module)}>×</button></span></div>{module.videoIds.length ? module.videoIds.map((videoId, videoIndex) => { const video = allVideos.find((item) => item.id === videoId); return video ? <div className="module-video" key={videoId}><span>{videoIndex + 1}. {video.title}</span><span><button onClick={() => reorderVideos(group, module, videoId, -1)}>↑</button><button onClick={() => reorderVideos(group, module, videoId, 1)}>↓</button></span></div> : null; }) : <p className="muted">Belum ada video dalam modul ini.</p>}</section>)}<button className="add-module" onClick={() => addModule(group)}>＋ Tambah modul</button></div></div></article>)}</section></section></main>;
-  return <main className="app-shell"><header className="topbar"><div className="logo-row"><div className="brand-mark small"><img src="/icon-192.png" alt="" /></div><div><strong>Digital Dominate</strong><span>Portal Pembelajaran</span></div></div><div className="top-actions"><span className="role-badge">{admin ? "Admin" : session.groupName}</span><button className="ghost" onClick={logout}>Log keluar ↗</button></div></header><section className={`dashboard${admin ? "" : " video-library"}`}>{admin && <><div className="welcome-row"><div><p className="eyebrow">PANEL PENGURUSAN</p><h1>{tab === "videos" ? "Urus video anda" : "Urus group anda"}</h1><p className="muted">{tab === "videos" ? "Tambah video dan tetapkan group aksesnya." : "Cipta group, tetapkan password dan pilih video."}</p></div><button className="primary" onClick={() => tab === "videos" ? openVideoForm() : openGroupForm()}>＋ {tab === "videos" ? "Tambah video" : "Tambah group"}</button></div><div className="admin-tabs"><button className={tab === "videos" ? "active" : ""} onClick={() => setTab("videos")}>Video</button><button className={tab === "groups" ? "active" : ""} onClick={() => setTab("groups")}>Kumpulan</button></div></>}{(tab === "videos" || !admin) && <><div className="toolbar"><div className="search"><span>⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cari tajuk video..." /></div><span className="count">{allVideos.length} video</span></div>{notice && <div className="notice">{notice}<button onClick={() => setNotice("")}>×</button></div>}{videos.length === 0 ? <section className="empty"><div>▷</div><h2>Belum ada video</h2><p>{admin ? "Tambah video untuk mula membina perpustakaan." : "Group ini belum mempunyai video."}</p></section> : <section className="video-grid">{videos.map((video, index) => <article className="video-card" key={video.id}><button className="thumbnail" onClick={() => setSelected(video)} aria-label={`Mainkan ${video.title}`}><img src={`https://i.ytimg.com/vi/${video.youtubeId}/maxresdefault.jpg`} onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = `https://i.ytimg.com/vi/${video.youtubeId}/hqdefault.jpg`; }} alt="" loading="lazy" /><span className="number">{String(index + 1).padStart(2, "0")}</span><span className="play">▶</span><span className="duration">VIDEO</span></button><div className="card-body"><h2>{video.title}</h2>{admin && <><div className="group-chips">{video.groups.length ? video.groups.map((group) => <span key={group.id}>{group.name}</span>) : <span>Tiada group</span>}</div><div className="card-actions"><button onClick={() => openVideoForm(video)}>Ubah</button><button className="danger" disabled={working === video.id} onClick={() => removeVideo(video)}>Padam</button></div></>}</div></article>)}</section>}</>}{admin && tab === "groups" && <><div className="toolbar group-toolbar"><span className="count">{groups.length} group</span></div>{notice && <div className="notice">{notice}<button onClick={() => setNotice("")}>×</button></div>}<section className="group-grid">{groups.map((group) => <article className="group-card" key={group.id}><div><p className="eyebrow">GROUP AKSES</p><h2>{group.name}</h2><p className="group-password">Password: <code>{revealed.includes(group.id) ? group.password : "••••••••"}</code> <button onClick={() => setRevealed((ids) => flip(ids, group.id))}>{revealed.includes(group.id) ? "Sembunyi" : "Lihat"}</button></p><p className="muted">{group.videoIds.length} video dipilih</p></div><div className="card-actions"><button onClick={() => openGroupForm(group)}>Ubah group</button><button className="danger" disabled={working === group.id} onClick={() => removeGroup(group)}>Padam</button></div></article>)}</section></>}</section>{selected && <div className="modal-backdrop player-backdrop" onMouseDown={() => setSelected(null)}><section className="player-modal" onMouseDown={(event) => event.stopPropagation()}><button className="modal-close" onClick={() => setSelected(null)}>×</button><section ref={frameRef} className={`player-frame${!admin ? " student-player" : ""}`}><iframe ref={playerRef} className="youtube-player" src={youtubeEmbedUrl(selected.youtubeId, window.location.origin, !admin)} title={selected.title} allow="autoplay; encrypted-media; picture-in-picture" sandbox="allow-scripts allow-same-origin allow-presentation" allowFullScreen={false} onLoad={connect} />{!admin && <><button className="player-surface" onClick={togglePlay}><span>{playing ? "❚❚" : "▶"}</span></button><div className="lms-player-controls"><div className="lms-seek"><span>{time(current)}</span><input type="range" min="0" max={duration || 0} value={Math.min(current, duration || 0)} onChange={(event) => seek(Number(event.target.value))} /><span>{time(duration)}</span></div><button onClick={togglePlay}>{playing ? "❚❚ Jeda" : "▶ Main"}</button><button onClick={toggleMute}>{muted ? "🔇 Hidupkan suara" : "🔊 Senyapkan"}</button><label className="lms-speed">Kelajuan <select value={rate} onChange={(event) => changeRate(Number(event.target.value))}>{rates.map((value) => <option key={value} value={value}>{value}×</option>)}</select></label><button onClick={toggleFullscreen}>{fullscreen ? "Keluar skrin penuh" : "⛶ Skrin penuh"}</button></div></>}</section><div><p className="eyebrow">VIDEO PEMBELAJARAN</p><h2>{selected.title}</h2></div></section></div>}{videoModal && <div className="modal-backdrop" onMouseDown={() => setVideoModal(false)}><form className="upload-modal manage-modal" onSubmit={saveVideo} onMouseDown={(event) => event.stopPropagation()} key={editingVideo?.id || "new"}><button type="button" className="modal-close" onClick={() => setVideoModal(false)}>×</button><p className="eyebrow">VIDEO</p><h2>{editingVideo ? "Ubah video" : "Tambah video YouTube"}</h2><label>Tajuk video</label><input name="title" defaultValue={editingVideo?.title} required maxLength={150} /><label>Pautan YouTube</label><input name="youtubeUrl" type="url" defaultValue={editingVideo ? `https://youtu.be/${editingVideo.youtubeId}` : ""} required /><p className="field-label">Boleh akses group</p><div className="check-list">{groups.map((group) => <label key={group.id}><input type="checkbox" checked={videoGroupIds.includes(group.id)} onChange={() => setVideoGroupIds((ids) => flip(ids, group.id))} /> {group.name}</label>)}</div><button className="primary full" disabled={working === "video"}>{working === "video" ? "Menyimpan..." : "Simpan video"}</button></form></div>}{groupModal && <div className="modal-backdrop" onMouseDown={() => setGroupModal(false)}><form className="upload-modal manage-modal" onSubmit={saveGroup} onMouseDown={(event) => event.stopPropagation()} key={editingGroup?.id || "new"}><button type="button" className="modal-close" onClick={() => setGroupModal(false)}>×</button><p className="eyebrow">GROUP AKSES</p><h2>{editingGroup ? "Ubah group" : "Tambah group"}</h2><label>Nama group</label><input name="name" defaultValue={editingGroup?.name} required maxLength={80} /><label>Password group</label><input name="password" defaultValue={editingGroup?.password} required minLength={6} maxLength={100} /><p className="field-label">Video dalam group ini</p><div className="check-list">{allVideos.map((video) => <label key={video.id}><input type="checkbox" checked={groupVideoIds.includes(video.id)} onChange={() => setGroupVideoIds((ids) => flip(ids, video.id))} /> {video.title}</label>)}</div><button className="primary full" disabled={working === "group"}>{working === "group" ? "Menyimpan..." : "Simpan group"}</button></form></div>}</main>;
+function Dashboard({
+  session,
+  videos,
+  allVideos,
+  groups,
+  search,
+  setSearch,
+  selected,
+  setSelected,
+  reload,
+  logout,
+}: {
+  session: Session;
+  videos: Video[];
+  allVideos: Video[];
+  groups: Group[];
+  search: string;
+  setSearch: (value: string) => void;
+  selected: Video | null;
+  setSelected: (video: Video | null) => void;
+  reload: () => Promise<void>;
+  logout: () => Promise<void>;
+}) {
+  const admin = session.role === "admin";
+  const [tab, setTab] = useState<"videos" | "groups">("videos");
+  const [notice, setNotice] = useState("");
+  const [working, setWorking] = useState("");
+  const [videoModal, setVideoModal] = useState(false);
+  const [editingVideo, setEditingVideo] = useState<Video | null>(null);
+  const [videoGroupIds, setVideoGroupIds] = useState<string[]>([]);
+  const [groupModal, setGroupModal] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<Group | null>(null);
+  const [groupVideoIds, setGroupVideoIds] = useState<string[]>([]);
+  const [revealed, setRevealed] = useState<string[]>([]);
+  const [playing, setPlaying] = useState(true);
+  const [muted, setMuted] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [rate, setRate] = useState(1);
+  const [current, setCurrent] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const playerRef = useRef<HTMLIFrameElement>(null);
+  const frameRef = useRef<HTMLElement>(null);
+  const currentRef = useRef(0);
+  useEffect(() => {
+    if (selected) {
+      setPlaying(true);
+      setMuted(false);
+      setCurrent(0);
+      setDuration(0);
+      currentRef.current = 0;
+    }
+  }, [selected]);
+  useEffect(() => {
+    const change = () =>
+      setFullscreen(document.fullscreenElement === frameRef.current);
+    document.addEventListener("fullscreenchange", change);
+    return () => document.removeEventListener("fullscreenchange", change);
+  }, []);
+  useEffect(() => {
+    const receive = (event: MessageEvent) => {
+      if (event.source !== playerRef.current?.contentWindow) return;
+      try {
+        const data =
+          typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+        if (data.event === "infoDelivery" && data.info) {
+          if (typeof data.info.currentTime === "number") {
+            currentRef.current = data.info.currentTime;
+            setCurrent(data.info.currentTime);
+          }
+          if (typeof data.info.duration === "number")
+            setDuration(data.info.duration);
+        }
+      } catch {
+        /* Ignore non-player messages. */
+      }
+    };
+    window.addEventListener("message", receive);
+    return () => window.removeEventListener("message", receive);
+  }, []);
+  function command(
+    func:
+      | "playVideo"
+      | "pauseVideo"
+      | "mute"
+      | "unMute"
+      | "setPlaybackRate"
+      | "seekTo",
+    args: Array<number | boolean> = [],
+  ) {
+    playerRef.current?.contentWindow?.postMessage(
+      JSON.stringify({ event: "command", func, args }),
+      "https://www.youtube-nocookie.com",
+    );
+  }
+  useEffect(() => {
+    if (!selected || !playing || rate <= 2) return;
+    const id = window.setInterval(
+      () => command("seekTo", [currentRef.current + rate - 2, true]),
+      1000,
+    );
+    return () => window.clearInterval(id);
+  }, [selected, playing, rate]);
+  function connect() {
+    playerRef.current?.contentWindow?.postMessage(
+      JSON.stringify({ event: "listening", id: "lms-player" }),
+      "https://www.youtube-nocookie.com",
+    );
+    command("setPlaybackRate", [Math.min(rate, 2)]);
+  }
+  function togglePlay() {
+    command(playing ? "pauseVideo" : "playVideo");
+    setPlaying((value) => !value);
+  }
+  function toggleMute() {
+    command(muted ? "unMute" : "mute");
+    setMuted((value) => !value);
+  }
+  async function toggleFullscreen() {
+    if (document.fullscreenElement) await document.exitFullscreen();
+    else await frameRef.current?.requestFullscreen();
+  }
+  function changeRate(value: number) {
+    setRate(value);
+    command("setPlaybackRate", [Math.min(value, 2)]);
+  }
+  function seek(value: number) {
+    currentRef.current = value;
+    setCurrent(value);
+    command("seekTo", [value, true]);
+  }
+  function openVideoForm(video?: Video) {
+    setEditingVideo(video || null);
+    setVideoGroupIds(video?.groups.map((group) => group.id) || []);
+    setVideoModal(true);
+  }
+  function openGroupForm(group?: Group) {
+    setEditingGroup(group || null);
+    setGroupVideoIds(group?.videoIds || []);
+    setGroupModal(true);
+  }
+  async function saveVideo(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setWorking("video");
+    const form = new FormData(event.currentTarget);
+    const endpoint = editingVideo
+      ? `/api/videos/${editingVideo.id}`
+      : "/api/videos";
+    const response = await fetch(endpoint, {
+      method: editingVideo ? "PATCH" : "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        title: form.get("title"),
+        youtubeUrl: form.get("youtubeUrl"),
+        groupIds: videoGroupIds,
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    setNotice(
+      response.ok
+        ? "Video berjaya disimpan."
+        : data.error || "Video tidak dapat disimpan.",
+    );
+    if (response.ok) {
+      setVideoModal(false);
+      await reload();
+    }
+    setWorking("");
+  }
+  async function saveGroup(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setWorking("group");
+    const form = new FormData(event.currentTarget);
+    const endpoint = editingGroup
+      ? `/api/groups/${editingGroup.id}`
+      : "/api/groups";
+    const response = await fetch(endpoint, {
+      method: editingGroup ? "PATCH" : "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: form.get("name"),
+        password: form.get("password"),
+        videoIds: groupVideoIds,
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    setNotice(
+      response.ok
+        ? "Group berjaya disimpan."
+        : data.error || "Group tidak dapat disimpan.",
+    );
+    if (response.ok) {
+      setGroupModal(false);
+      await reload();
+    }
+    setWorking("");
+  }
+  async function removeVideo(video: Video) {
+    if (!window.confirm(`Padam “${video.title}”?`)) return;
+    setWorking(video.id);
+    const response = await fetch(`/api/videos/${video.id}`, {
+      method: "DELETE",
+    });
+    const data = await response.json().catch(() => ({}));
+    setNotice(
+      response.ok
+        ? "Video telah dipadam."
+        : data.error || "Video tidak dapat dipadam.",
+    );
+    if (response.ok) await reload();
+    setWorking("");
+  }
+  async function removeGroup(group: Group) {
+    if (
+      !window.confirm(
+        `Padam group “${group.name}”? Video YouTube tidak akan dipadam.`,
+      )
+    )
+      return;
+    setWorking(group.id);
+    const response = await fetch(`/api/groups/${group.id}`, {
+      method: "DELETE",
+    });
+    const data = await response.json().catch(() => ({}));
+    setNotice(
+      response.ok
+        ? "Group telah dipadam."
+        : data.error || "Group tidak dapat dipadam.",
+    );
+    if (response.ok) await reload();
+    setWorking("");
+  }
+  async function addModule(group: Group) {
+    const title = window.prompt("Tajuk modul baharu")?.trim();
+    if (!title) return;
+    const response = await fetch(`/api/groups/${group.id}/modules`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title }),
+    });
+    const data = await response.json().catch(() => ({}));
+    setNotice(
+      response.ok
+        ? "Modul berjaya ditambah."
+        : data.error || "Modul tidak dapat ditambah.",
+    );
+    if (response.ok) await reload();
+  }
+  async function renameModule(group: Group, module: GroupModule) {
+    const title = window.prompt("Tajuk modul", module.title)?.trim();
+    if (!title || title === module.title) return;
+    const response = await fetch(
+      `/api/groups/${group.id}/modules/${module.id}`,
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ title }),
+      },
+    );
+    const data = await response.json().catch(() => ({}));
+    setNotice(
+      response.ok
+        ? "Tajuk modul dikemas kini."
+        : data.error || "Modul tidak dapat dikemas kini.",
+    );
+    if (response.ok) await reload();
+  }
+  async function removeModule(group: Group, module: GroupModule) {
+    if (
+      !window.confirm(
+        `Padam modul “${module.title}”? Video akan dipindahkan ke modul lain.`,
+      )
+    )
+      return;
+    const response = await fetch(
+      `/api/groups/${group.id}/modules/${module.id}`,
+      { method: "DELETE" },
+    );
+    const data = await response.json().catch(() => ({}));
+    setNotice(
+      response.ok
+        ? "Modul telah dipadam."
+        : data.error || "Modul tidak dapat dipadam.",
+    );
+    if (response.ok) await reload();
+  }
+  async function reorderModules(
+    group: Group,
+    moduleId: string,
+    direction: -1 | 1,
+  ) {
+    const modules = [...group.modules].sort(
+      (a, b) => a.sortOrder - b.sortOrder,
+    );
+    const index = modules.findIndex((module) => module.id === moduleId);
+    const target = index + direction;
+    if (target < 0 || target >= modules.length) return;
+    [modules[index], modules[target]] = [modules[target], modules[index]];
+    const response = await fetch(`/api/groups/${group.id}/modules/order`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ moduleIds: modules.map((module) => module.id) }),
+    });
+    if (response.ok) await reload();
+  }
+  async function reorderVideos(
+    group: Group,
+    module: GroupModule,
+    videoId: string,
+    direction: -1 | 1,
+  ) {
+    const ids = [...module.videoIds];
+    const index = ids.indexOf(videoId);
+    const target = index + direction;
+    if (target < 0 || target >= ids.length) return;
+    [ids[index], ids[target]] = [ids[target], ids[index]];
+    const response = await fetch(
+      `/api/groups/${group.id}/modules/${module.id}`,
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ videoIds: ids }),
+      },
+    );
+    if (response.ok) await reload();
+  }
+  async function saveVideoOrder(
+    group: Group,
+    module: GroupModule,
+    videoIds: string[],
+  ) {
+    const response = await fetch(
+      `/api/groups/${group.id}/modules/${module.id}`,
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ videoIds }),
+      },
+    );
+    const data = await response.json().catch(() => ({}));
+    setNotice(
+      response.ok
+        ? "Susunan video dikemas kini."
+        : data.error || "Susunan video tidak dapat dikemas kini.",
+    );
+    if (response.ok) await reload();
+  }
+  if (admin && tab === "groups")
+    return (
+      <GroupManager
+        groups={groups}
+        videos={allVideos}
+        reload={reload}
+        logout={logout}
+        showVideos={() => setTab("videos")}
+        addModule={addModule}
+        renameModule={renameModule}
+        removeModule={removeModule}
+        reorderModules={reorderModules}
+        reorderVideos={reorderVideos}
+        saveVideoOrder={saveVideoOrder}
+      />
+    );
+  if (admin && tab === "groups")
+    return (
+      <main className="app-shell">
+        <header className="topbar">
+          <div className="logo-row">
+            <div className="brand-mark small">
+              <img src="/icon-192.png" alt="" />
+            </div>
+            <div>
+              <strong>Digital Dominate</strong>
+              <span>Portal Pembelajaran</span>
+            </div>
+          </div>
+          <div className="top-actions">
+            <span className="role-badge">Admin</span>
+            <button className="ghost" onClick={logout}>
+              Log keluar ↗
+            </button>
+          </div>
+        </header>
+        <section className="dashboard">
+          <div className="welcome-row">
+            <div>
+              <p className="eyebrow">PANEL PENGURUSAN</p>
+              <h1>Modul dan susunan video</h1>
+              <p className="muted">
+                Tambah modul dan susun video mengikut urutan pembelajaran setiap
+                group.
+              </p>
+            </div>
+            <button className="primary" onClick={() => setTab("videos")}>
+              ← Video
+            </button>
+          </div>
+          <div className="admin-tabs">
+            <button onClick={() => setTab("videos")}>Video</button>
+            <button className="active">Kumpulan</button>
+          </div>
+          <section className="group-grid">
+            {groups.map((group) => (
+              <article className="group-card module-group" key={group.id}>
+                <div>
+                  <p className="eyebrow">GROUP AKSES</p>
+                  <h2>{group.name}</h2>
+                  <div className="module-list">
+                    {[...group.modules]
+                      .sort((a, b) => a.sortOrder - b.sortOrder)
+                      .map((module, moduleIndex) => (
+                        <section className="module-admin" key={module.id}>
+                          <div className="module-head">
+                            <strong>
+                              Modul {moduleIndex + 1}: {module.title}
+                            </strong>
+                            <span>
+                              <button
+                                onClick={() =>
+                                  reorderModules(group, module.id, -1)
+                                }
+                              >
+                                ↑
+                              </button>
+                              <button
+                                onClick={() =>
+                                  reorderModules(group, module.id, 1)
+                                }
+                              >
+                                ↓
+                              </button>
+                              <button
+                                onClick={() => renameModule(group, module)}
+                              >
+                                Ubah
+                              </button>
+                              <button
+                                onClick={() => removeModule(group, module)}
+                              >
+                                ×
+                              </button>
+                            </span>
+                          </div>
+                          {module.videoIds.length ? (
+                            module.videoIds.map((videoId, videoIndex) => {
+                              const video = allVideos.find(
+                                (item) => item.id === videoId,
+                              );
+                              return video ? (
+                                <div className="module-video" key={videoId}>
+                                  <span>
+                                    {videoIndex + 1}. {video.title}
+                                  </span>
+                                  <span>
+                                    <button
+                                      onClick={() =>
+                                        reorderVideos(
+                                          group,
+                                          module,
+                                          videoId,
+                                          -1,
+                                        )
+                                      }
+                                    >
+                                      ↑
+                                    </button>
+                                    <button
+                                      onClick={() =>
+                                        reorderVideos(group, module, videoId, 1)
+                                      }
+                                    >
+                                      ↓
+                                    </button>
+                                  </span>
+                                </div>
+                              ) : null;
+                            })
+                          ) : (
+                            <p className="muted">
+                              Belum ada video dalam modul ini.
+                            </p>
+                          )}
+                        </section>
+                      ))}
+                    <button
+                      className="add-module"
+                      onClick={() => addModule(group)}
+                    >
+                      ＋ Tambah modul
+                    </button>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </section>
+        </section>
+      </main>
+    );
+  return (
+    <main className="app-shell">
+      <header className="topbar">
+        <div className="logo-row">
+          <div className="brand-mark small">
+            <img src="/icon-192.png" alt="" />
+          </div>
+          <div>
+            <strong>Digital Dominate</strong>
+            <span>Portal Pembelajaran</span>
+          </div>
+        </div>
+        <div className="top-actions">
+          <span className="role-badge">
+            {admin ? "Admin" : session.groupName}
+          </span>
+          <button className="ghost" onClick={logout}>
+            Log keluar ↗
+          </button>
+        </div>
+      </header>
+      <section className={`dashboard${admin ? "" : " video-library"}`}>
+        {admin && (
+          <>
+            <div className="welcome-row">
+              <div>
+                <p className="eyebrow">PANEL PENGURUSAN</p>
+                <h1>
+                  {tab === "videos" ? "Urus video anda" : "Urus group anda"}
+                </h1>
+                <p className="muted">
+                  {tab === "videos"
+                    ? "Tambah video dan tetapkan group aksesnya."
+                    : "Cipta group, tetapkan password dan pilih video."}
+                </p>
+              </div>
+              <button
+                className="primary"
+                onClick={() =>
+                  tab === "videos" ? openVideoForm() : openGroupForm()
+                }
+              >
+                ＋ {tab === "videos" ? "Tambah video" : "Tambah group"}
+              </button>
+            </div>
+            <div className="admin-tabs">
+              <button
+                className={tab === "videos" ? "active" : ""}
+                onClick={() => setTab("videos")}
+              >
+                Video
+              </button>
+              <button
+                className={tab === "groups" ? "active" : ""}
+                onClick={() => setTab("groups")}
+              >
+                Kumpulan
+              </button>
+            </div>
+          </>
+        )}
+        {(tab === "videos" || !admin) && (
+          <>
+            <div className="toolbar">
+              <div className="search">
+                <span>⌕</span>
+                <input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Cari tajuk video..."
+                />
+              </div>
+              <span className="count">{allVideos.length} video</span>
+            </div>
+            {notice && (
+              <div className="notice">
+                {notice}
+                <button onClick={() => setNotice("")}>×</button>
+              </div>
+            )}
+            {videos.length === 0 ? (
+              <section className="empty">
+                <div>▷</div>
+                <h2>Belum ada video</h2>
+                <p>
+                  {admin
+                    ? "Tambah video untuk mula membina perpustakaan."
+                    : "Group ini belum mempunyai video."}
+                </p>
+              </section>
+            ) : (
+              <section className="video-grid">
+                {videos.map((video, index) => (
+                  <Fragment key={video.id}>
+                    {!admin &&
+                      (index === 0 ||
+                        videos[index - 1].module?.id !== video.module?.id) && (
+                        <header className="module-title">
+                          <p>MODUL</p>
+                          <h2>{video.module?.title || "Video"}</h2>
+                        </header>
+                      )}
+                    <article className="video-card">
+                      <button
+                        className="thumbnail"
+                        onClick={() => setSelected(video)}
+                        aria-label={`Mainkan ${video.title}`}
+                      >
+                        <img
+                          src={`https://i.ytimg.com/vi/${video.youtubeId}/maxresdefault.jpg`}
+                          onError={(event) => {
+                            event.currentTarget.onerror = null;
+                            event.currentTarget.src = `https://i.ytimg.com/vi/${video.youtubeId}/hqdefault.jpg`;
+                          }}
+                          alt=""
+                          loading="lazy"
+                        />
+                        <span className="number">
+                          {String(index + 1).padStart(2, "0")}
+                        </span>
+                        <span className="play">▶</span>
+                        <span className="duration">VIDEO</span>
+                      </button>
+                      <div className="card-body">
+                        <h2>{video.title}</h2>
+                        {admin && (
+                          <>
+                            <div className="group-chips">
+                              {video.groups.length ? (
+                                video.groups.map((group) => (
+                                  <span key={group.id}>{group.name}</span>
+                                ))
+                              ) : (
+                                <span>Tiada group</span>
+                              )}
+                            </div>
+                            <div className="card-actions">
+                              <button onClick={() => openVideoForm(video)}>
+                                Ubah
+                              </button>
+                              <button
+                                className="danger"
+                                disabled={working === video.id}
+                                onClick={() => removeVideo(video)}
+                              >
+                                Padam
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </article>
+                  </Fragment>
+                ))}
+              </section>
+            )}
+          </>
+        )}
+        {admin && tab === "groups" && (
+          <>
+            <div className="toolbar group-toolbar">
+              <span className="count">{groups.length} group</span>
+            </div>
+            {notice && (
+              <div className="notice">
+                {notice}
+                <button onClick={() => setNotice("")}>×</button>
+              </div>
+            )}
+            <section className="group-grid">
+              {groups.map((group) => (
+                <article className="group-card" key={group.id}>
+                  <div>
+                    <p className="eyebrow">GROUP AKSES</p>
+                    <h2>{group.name}</h2>
+                    <p className="group-password">
+                      Password:{" "}
+                      <code>
+                        {revealed.includes(group.id)
+                          ? group.password
+                          : "••••••••"}
+                      </code>{" "}
+                      <button
+                        onClick={() =>
+                          setRevealed((ids) => flip(ids, group.id))
+                        }
+                      >
+                        {revealed.includes(group.id) ? "Sembunyi" : "Lihat"}
+                      </button>
+                    </p>
+                    <p className="muted">
+                      {group.videoIds.length} video dipilih
+                    </p>
+                  </div>
+                  <div className="card-actions">
+                    <button onClick={() => openGroupForm(group)}>
+                      Ubah group
+                    </button>
+                    <button
+                      className="danger"
+                      disabled={working === group.id}
+                      onClick={() => removeGroup(group)}
+                    >
+                      Padam
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </section>
+          </>
+        )}
+      </section>
+      {selected && (
+        <div
+          className="modal-backdrop player-backdrop"
+          onMouseDown={() => setSelected(null)}
+        >
+          <section
+            className="player-modal"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button className="modal-close" onClick={() => setSelected(null)}>
+              ×
+            </button>
+            <section
+              ref={frameRef}
+              className={`player-frame${!admin ? " student-player" : ""}`}
+            >
+              <iframe
+                ref={playerRef}
+                className="youtube-player"
+                src={youtubeEmbedUrl(
+                  selected.youtubeId,
+                  window.location.origin,
+                  !admin,
+                )}
+                title={selected.title}
+                allow="autoplay; encrypted-media; picture-in-picture"
+                sandbox="allow-scripts allow-same-origin allow-presentation"
+                allowFullScreen={false}
+                onLoad={connect}
+              />
+              {!admin && (
+                <>
+                  <button className="player-surface" onClick={togglePlay}>
+                    <span>{playing ? "❚❚" : "▶"}</span>
+                  </button>
+                  <div className="lms-player-controls">
+                    <div className="lms-seek">
+                      <span>{time(current)}</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max={duration || 0}
+                        value={Math.min(current, duration || 0)}
+                        onChange={(event) => seek(Number(event.target.value))}
+                      />
+                      <span>{time(duration)}</span>
+                    </div>
+                    <button onClick={togglePlay}>
+                      {playing ? "❚❚ Jeda" : "▶ Main"}
+                    </button>
+                    <button onClick={toggleMute}>
+                      {muted ? "🔇 Hidupkan suara" : "🔊 Senyapkan"}
+                    </button>
+                    <label className="lms-speed">
+                      Kelajuan{" "}
+                      <select
+                        value={rate}
+                        onChange={(event) =>
+                          changeRate(Number(event.target.value))
+                        }
+                      >
+                        {rates.map((value) => (
+                          <option key={value} value={value}>
+                            {value}×
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <button onClick={toggleFullscreen}>
+                      {fullscreen ? "Keluar skrin penuh" : "⛶ Skrin penuh"}
+                    </button>
+                  </div>
+                </>
+              )}
+            </section>
+            <div>
+              <p className="eyebrow">VIDEO PEMBELAJARAN</p>
+              <h2>{selected.title}</h2>
+            </div>
+          </section>
+        </div>
+      )}
+      {videoModal && (
+        <div
+          className="modal-backdrop"
+          onMouseDown={() => setVideoModal(false)}
+        >
+          <form
+            className="upload-modal manage-modal"
+            onSubmit={saveVideo}
+            onMouseDown={(event) => event.stopPropagation()}
+            key={editingVideo?.id || "new"}
+          >
+            <button
+              type="button"
+              className="modal-close"
+              onClick={() => setVideoModal(false)}
+            >
+              ×
+            </button>
+            <p className="eyebrow">VIDEO</p>
+            <h2>{editingVideo ? "Ubah video" : "Tambah video YouTube"}</h2>
+            <label>Tajuk video</label>
+            <input
+              name="title"
+              defaultValue={editingVideo?.title}
+              required
+              maxLength={150}
+            />
+            <label>Pautan YouTube</label>
+            <input
+              name="youtubeUrl"
+              type="url"
+              defaultValue={
+                editingVideo ? `https://youtu.be/${editingVideo.youtubeId}` : ""
+              }
+              required
+            />
+            <p className="field-label">Boleh akses group</p>
+            <div className="check-list">
+              {groups.map((group) => (
+                <label key={group.id}>
+                  <input
+                    type="checkbox"
+                    checked={videoGroupIds.includes(group.id)}
+                    onChange={() =>
+                      setVideoGroupIds((ids) => flip(ids, group.id))
+                    }
+                  />{" "}
+                  {group.name}
+                </label>
+              ))}
+            </div>
+            <button className="primary full" disabled={working === "video"}>
+              {working === "video" ? "Menyimpan..." : "Simpan video"}
+            </button>
+          </form>
+        </div>
+      )}
+      {groupModal && (
+        <div
+          className="modal-backdrop"
+          onMouseDown={() => setGroupModal(false)}
+        >
+          <form
+            className="upload-modal manage-modal"
+            onSubmit={saveGroup}
+            onMouseDown={(event) => event.stopPropagation()}
+            key={editingGroup?.id || "new"}
+          >
+            <button
+              type="button"
+              className="modal-close"
+              onClick={() => setGroupModal(false)}
+            >
+              ×
+            </button>
+            <p className="eyebrow">GROUP AKSES</p>
+            <h2>{editingGroup ? "Ubah group" : "Tambah group"}</h2>
+            <label>Nama group</label>
+            <input
+              name="name"
+              defaultValue={editingGroup?.name}
+              required
+              maxLength={80}
+            />
+            <label>Password group</label>
+            <input
+              name="password"
+              defaultValue={editingGroup?.password}
+              required
+              minLength={6}
+              maxLength={100}
+            />
+            <p className="field-label">Video dalam group ini</p>
+            <div className="check-list">
+              {allVideos.map((video) => (
+                <label key={video.id}>
+                  <input
+                    type="checkbox"
+                    checked={groupVideoIds.includes(video.id)}
+                    onChange={() =>
+                      setGroupVideoIds((ids) => flip(ids, video.id))
+                    }
+                  />{" "}
+                  {video.title}
+                </label>
+              ))}
+            </div>
+            <button className="primary full" disabled={working === "group"}>
+              {working === "group" ? "Menyimpan..." : "Simpan group"}
+            </button>
+          </form>
+        </div>
+      )}
+    </main>
+  );
 }

@@ -6,6 +6,12 @@ import { youtubeEmbedUrl } from "@/lib/youtube";
 type Role = "admin" | "student";
 type Video = { id: string; title: string; youtubeId: string; createdAt: string };
 
+function formatPlayerTime(seconds: number) {
+  if (!Number.isFinite(seconds)) return "0:00";
+  const wholeSeconds = Math.max(0, Math.floor(seconds));
+  return `${Math.floor(wholeSeconds / 60)}:${String(wholeSeconds % 60).padStart(2, "0")}`;
+}
+
 export default function Home() {
   const [session, setSession] = useState<{ role: Role } | null>(null);
   const [checking, setChecking] = useState(true);
@@ -83,11 +89,18 @@ function Dashboard({ role, videos, allVideos, search, setSearch, selected, setSe
   const [playerPlaying, setPlayerPlaying] = useState(true);
   const [playerMuted, setPlayerMuted] = useState(false);
   const [playerFullscreen, setPlayerFullscreen] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
   const playerRef = useRef<HTMLIFrameElement>(null);
   const playerFrameRef = useRef<HTMLElement>(null);
+  const currentTimeRef = useRef(0);
 
   useEffect(() => {
-    if (selected) { setPlayerPlaying(true); setPlayerMuted(false); }
+    if (selected) {
+      setPlayerPlaying(true); setPlayerMuted(false); setCurrentTime(0); setDuration(0);
+      currentTimeRef.current = 0;
+    }
   }, [selected]);
 
   useEffect(() => {
@@ -96,8 +109,48 @@ function Dashboard({ role, videos, allVideos, search, setSearch, selected, setSe
     return () => document.removeEventListener("fullscreenchange", updateFullscreen);
   }, []);
 
-  function playerCommand(command: "playVideo" | "pauseVideo" | "mute" | "unMute") {
-    playerRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func: command, args: [] }), "https://www.youtube-nocookie.com");
+  useEffect(() => {
+    const receivePlayerInfo = (event: MessageEvent) => {
+      if (event.source !== playerRef.current?.contentWindow) return;
+      let data: { event?: string; info?: { currentTime?: number; duration?: number } };
+      try { data = typeof event.data === "string" ? JSON.parse(event.data) : event.data; } catch { return; }
+      if (data.event !== "infoDelivery" || !data.info) return;
+      if (typeof data.info.currentTime === "number") {
+        currentTimeRef.current = data.info.currentTime;
+        setCurrentTime(data.info.currentTime);
+      }
+      if (typeof data.info.duration === "number") setDuration(data.info.duration);
+    };
+    window.addEventListener("message", receivePlayerInfo);
+    return () => window.removeEventListener("message", receivePlayerInfo);
+  }, []);
+
+  useEffect(() => {
+    if (!selected || !playerPlaying || playbackRate <= 2) return;
+    const booster = window.setInterval(() => {
+      playerCommand("seekTo", [currentTimeRef.current + playbackRate - 2, true]);
+    }, 1000);
+    return () => window.clearInterval(booster);
+  }, [playbackRate, playerPlaying, selected]);
+
+  function playerCommand(command: "playVideo" | "pauseVideo" | "mute" | "unMute" | "setPlaybackRate" | "seekTo", args: Array<number | boolean> = []) {
+    playerRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func: command, args }), "https://www.youtube-nocookie.com");
+  }
+
+  function connectPlayer() {
+    playerRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "listening", id: "lms-player" }), "https://www.youtube-nocookie.com");
+    playerCommand("setPlaybackRate", [Math.min(playbackRate, 2)]);
+  }
+
+  function changePlaybackRate(rate: number) {
+    setPlaybackRate(rate);
+    playerCommand("setPlaybackRate", [Math.min(rate, 2)]);
+  }
+
+  function seekVideo(time: number) {
+    currentTimeRef.current = time;
+    setCurrentTime(time);
+    playerCommand("seekTo", [time, true]);
   }
 
   function togglePlayback() {
@@ -163,7 +216,7 @@ function Dashboard({ role, videos, allVideos, search, setSearch, selected, setSe
             <div className="card-body"><h2>{video.title}</h2>{role === "admin" && <div className="card-actions"><button onClick={() => edit(video)}>Ubah tajuk</button><button className="danger" disabled={working === video.id} onClick={() => remove(video)}>Padam</button></div>}</div>
           </article>)}</section>}
       </section>
-      {selected && <div className="modal-backdrop player-backdrop" onMouseDown={() => setSelected(null)} onContextMenu={(e) => e.preventDefault()}><section className="player-modal" onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={selected.title}><button className="modal-close" onClick={() => setSelected(null)} aria-label="Tutup">×</button><section ref={playerFrameRef} className={`player-frame${role === "student" ? " student-player" : ""}`}><iframe ref={playerRef} className="youtube-player" src={youtubeEmbedUrl(selected.youtubeId, window.location.origin, role === "student")} title={selected.title} allow="autoplay; encrypted-media; picture-in-picture" sandbox="allow-scripts allow-same-origin allow-presentation" allowFullScreen={false} referrerPolicy="strict-origin-when-cross-origin" />{role === "student" && <><button type="button" className="player-surface" onClick={togglePlayback} onContextMenu={(e) => e.preventDefault()} aria-label={playerPlaying ? "Jeda video" : "Mainkan video"}><span>{playerPlaying ? "❚❚" : "▶"}</span></button><div className="lms-player-controls"><button type="button" onClick={togglePlayback}>{playerPlaying ? "❚❚ Jeda" : "▶ Main"}</button><button type="button" onClick={toggleSound}>{playerMuted ? "🔇 Hidupkan suara" : "🔊 Senyapkan"}</button><button type="button" onClick={toggleFullscreen}>{playerFullscreen ? "⊙ Keluar skrin penuh" : "⛶ Skrin penuh"}</button></div></>}</section><div><p className="eyebrow">VIDEO PEMBELAJARAN</p><h2>{selected.title}</h2></div></section></div>}
+      {selected && <div className="modal-backdrop player-backdrop" onMouseDown={() => setSelected(null)} onContextMenu={(e) => e.preventDefault()}><section className="player-modal" onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={selected.title}><button className="modal-close" onClick={() => setSelected(null)} aria-label="Tutup">×</button><section ref={playerFrameRef} className={`player-frame${role === "student" ? " student-player" : ""}`}><iframe ref={playerRef} className="youtube-player" src={youtubeEmbedUrl(selected.youtubeId, window.location.origin, role === "student")} title={selected.title} allow="autoplay; encrypted-media; picture-in-picture" sandbox="allow-scripts allow-same-origin allow-presentation" allowFullScreen={false} referrerPolicy="strict-origin-when-cross-origin" onLoad={connectPlayer} />{role === "student" && <><button type="button" className="player-surface" onClick={togglePlayback} onContextMenu={(e) => e.preventDefault()} aria-label={playerPlaying ? "Jeda video" : "Mainkan video"}><span>{playerPlaying ? "❚❚" : "▶"}</span></button><div className="lms-player-controls"><div className="lms-seek"><span>{formatPlayerTime(currentTime)}</span><input type="range" min="0" max={duration || 0} step="1" value={Math.min(currentTime, duration || 0)} onChange={(event) => seekVideo(Number(event.target.value))} aria-label="Pilih masa video" /><span>{formatPlayerTime(duration)}</span></div><button type="button" onClick={togglePlayback}>{playerPlaying ? "❚❚ Jeda" : "▶ Main"}</button><button type="button" onClick={toggleSound}>{playerMuted ? "🔇 Hidupkan suara" : "🔊 Senyapkan"}</button><label className="lms-speed"><span>Kelajuan</span><select value={playbackRate} onChange={(event) => changePlaybackRate(Number(event.target.value))}>{[1, 1.25, 1.5, 2, 2.5, 3].map((rate) => <option key={rate} value={rate}>{rate}×</option>)}</select></label><button type="button" onClick={toggleFullscreen}>{playerFullscreen ? "⊙ Keluar skrin penuh" : "⛶ Skrin penuh"}</button></div></>}</section><div><p className="eyebrow">VIDEO PEMBELAJARAN</p><h2>{selected.title}</h2></div></section></div>}
       {uploadOpen && <div className="modal-backdrop" onMouseDown={() => setUploadOpen(false)}><form className="upload-modal" onSubmit={addVideo} onMouseDown={(e) => e.stopPropagation()}><button type="button" className="modal-close" onClick={() => setUploadOpen(false)}>×</button><p className="eyebrow">KANDUNGAN BAHARU</p><h2>Tambah video YouTube</h2><p className="muted">Gunakan pautan video YouTube yang ditetapkan sebagai Unlisted.</p><label htmlFor="title">Tajuk video</label><input id="title" name="title" maxLength={150} required placeholder="Contoh: Pengenalan K-Method" /><label htmlFor="youtubeUrl">Pautan YouTube</label><input id="youtubeUrl" name="youtubeUrl" type="url" required placeholder="https://youtu.be/..." /><button className="primary full" disabled={working === "add"}>{working === "add" ? "Sedang menambah..." : "Tambah video"}</button></form></div>}
     </main>
   );

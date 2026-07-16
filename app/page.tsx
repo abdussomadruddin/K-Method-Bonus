@@ -39,7 +39,7 @@ type Group = {
   videoIds: string[];
   modules: GroupModule[];
 };
-const rates = [1, 1.25, 1.5, 2, 2.5, 3];
+const rates = [1, 1.25, 1.5, 1.75, 2];
 function time(value: number) {
   const s = Math.max(0, Math.floor(Number.isFinite(value) ? value : 0));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -551,20 +551,12 @@ function Dashboard({
       "https://www.youtube-nocookie.com",
     );
   }
-  useEffect(() => {
-    if (!selected || !playing || rate <= 2) return;
-    const id = window.setInterval(
-      () => command("seekTo", [currentRef.current + rate - 2, true]),
-      1000,
-    );
-    return () => window.clearInterval(id);
-  }, [selected, playing, rate]);
   function connect() {
     playerRef.current?.contentWindow?.postMessage(
       JSON.stringify({ event: "listening", id: "lms-player" }),
       "https://www.youtube-nocookie.com",
     );
-    command("setPlaybackRate", [Math.min(rate, 2)]);
+    command("setPlaybackRate", [rate]);
   }
   function togglePlay() {
     command(playing ? "pauseVideo" : "playVideo");
@@ -580,7 +572,7 @@ function Dashboard({
   }
   function changeRate(value: number) {
     setRate(value);
-    command("setPlaybackRate", [Math.min(value, 2)]);
+    command("setPlaybackRate", [value]);
   }
   function seek(value: number) {
     currentRef.current = value;

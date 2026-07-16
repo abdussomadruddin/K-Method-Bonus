@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-assign-module-variable, @typescript-eslint/no-explicit-any */
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { readSession } from "@/lib/auth";

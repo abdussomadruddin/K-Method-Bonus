@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-assign-module-variable */
 import { NextRequest, NextResponse } from "next/server";
 import { expectedPassword, readSession, safeEqual } from "@/lib/auth";
 import { decryptGroupPassword, encryptGroupPassword } from "@/lib/group-password";

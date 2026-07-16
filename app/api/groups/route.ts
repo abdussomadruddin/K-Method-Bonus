@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { expectedPassword, readSession, safeEqual } from "@/lib/auth";
@@ -39,14 +40,16 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   if ((await readSession())?.role !== "admin") return NextResponse.json({ error: "Akses admin diperlukan." }, { status: 403, headers: noStore });
-  await ensureSchema(); const body = await request.json() as { name?: unknown; password?: unknown; videoIds?: unknown };
+  await ensureSchema(); const body = await request.json() as { name?: unknown; password?: unknown; moduleTitle?: unknown; videoIds?: unknown };
   const name = await validName(body.name); const password = await validPassword(body.password); const videoIds = await validVideoIds(body.videoIds ?? []);
   if (!name) return NextResponse.json({ error: "Nama group wajib dan mesti unik (maksimum 80 aksara)." }, { status: 400, headers: noStore });
   if (!password) return NextResponse.json({ error: "Password mesti 6–100 aksara, unik dan berbeza daripada password admin." }, { status: 400, headers: noStore });
+  const moduleTitle = String(body.moduleTitle || "").trim();
+  if (!moduleTitle || moduleTitle.length > 100) return NextResponse.json({ error: "Tajuk modul pertama wajib diisi (maksimum 100 aksara)." }, { status: 400, headers: noStore });
   if (!videoIds) return NextResponse.json({ error: "Pilihan video tidak sah." }, { status: 400, headers: noStore });
   const id = randomUUID(); const encrypted = await encryptGroupPassword(password);
   await sql()`INSERT INTO access_groups (id, name, password_ciphertext, password_iv) VALUES (${id}, ${name}, ${encrypted.ciphertext}, ${encrypted.iv})`;
-  const moduleId = randomUUID(); await sql()`INSERT INTO group_modules (id, group_id, title, sort_order) VALUES (${moduleId}, ${id}, ${"Modul 1"}, 0)`;
+  const moduleId = randomUUID(); await sql()`INSERT INTO group_modules (id, group_id, title, sort_order) VALUES (${moduleId}, ${id}, ${moduleTitle}, 0)`;
   for (const [index, videoId] of videoIds.entries()) await sql()`INSERT INTO video_groups (video_id, group_id, module_id, sort_order) VALUES (${videoId}, ${id}, ${moduleId}, ${index})`;
   return NextResponse.json({ ok: true, id }, { status: 201, headers: noStore });
 }

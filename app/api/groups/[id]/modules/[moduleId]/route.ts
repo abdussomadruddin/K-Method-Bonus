@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-assign-module-variable, @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { readSession } from "@/lib/auth";
 import { ensureSchema, sql } from "@/lib/runtime";

@@ -1172,65 +1172,67 @@ function Dashboard({
             </button>
             <section
               ref={frameRef}
-              className={`player-frame${!admin ? " student-player" : ""}`}
+              className={`player-stage${!admin ? " student-player" : ""}`}
             >
-              <iframe
-                ref={playerRef}
-                className="youtube-player"
-                src={youtubeEmbedUrl(
-                  selected.youtubeId,
-                  window.location.origin,
-                  !admin,
-                )}
-                title={selected.title}
-                allow="autoplay; encrypted-media; picture-in-picture"
-                sandbox="allow-scripts allow-same-origin allow-presentation"
-                allowFullScreen={false}
-                onLoad={connect}
-              />
-              {!admin && (
-                <>
+              <section className="player-frame">
+                <iframe
+                  ref={playerRef}
+                  className="youtube-player"
+                  src={youtubeEmbedUrl(
+                    selected.youtubeId,
+                    window.location.origin,
+                    !admin,
+                  )}
+                  title={selected.title}
+                  allow="autoplay; encrypted-media; picture-in-picture"
+                  sandbox="allow-scripts allow-same-origin allow-presentation"
+                  allowFullScreen={false}
+                  onLoad={connect}
+                />
+                {!admin && (
                   <button className="player-surface" onClick={togglePlay}>
                     <span>{playing ? "❚❚" : "▶"}</span>
                   </button>
-                  <div className="lms-player-controls">
-                    <div className="lms-seek">
-                      <span>{time(current)}</span>
-                      <input
-                        type="range"
-                        min="0"
-                        max={duration || 0}
-                        value={Math.min(current, duration || 0)}
-                        onChange={(event) => seek(Number(event.target.value))}
-                      />
-                      <span>{time(duration)}</span>
-                    </div>
-                    <button onClick={togglePlay}>
-                      {playing ? "❚❚ Jeda" : "▶ Main"}
-                    </button>
-                    <button onClick={toggleMute}>
-                      {muted ? "🔇 Hidupkan suara" : "🔊 Senyapkan"}
-                    </button>
-                    <label className="lms-speed">
-                      Kelajuan{" "}
-                      <select
-                        value={rate}
-                        onChange={(event) =>
-                          changeRate(Number(event.target.value))
-                        }
-                      >
-                        {rates.map((value) => (
-                          <option key={value} value={value}>
-                            {value}×
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <button onClick={toggleFullscreen}>
-                      {fullscreen ? "Keluar skrin penuh" : "⛶ Skrin penuh"}
-                    </button>
+                )}
+              </section>
+              {!admin && (
+                <div className="lms-player-controls">
+                  <div className="lms-seek">
+                    <span>{time(current)}</span>
+                    <input
+                      type="range"
+                      min="0"
+                      max={duration || 0}
+                      value={Math.min(current, duration || 0)}
+                      onChange={(event) => seek(Number(event.target.value))}
+                    />
+                    <span>{time(duration)}</span>
                   </div>
-                </>
+                  <button onClick={togglePlay}>
+                    {playing ? "❚❚ Jeda" : "▶ Main"}
+                  </button>
+                  <button onClick={toggleMute}>
+                    {muted ? "🔇 Hidupkan suara" : "🔊 Senyapkan"}
+                  </button>
+                  <label className="lms-speed">
+                    Kelajuan{" "}
+                    <select
+                      value={rate}
+                      onChange={(event) =>
+                        changeRate(Number(event.target.value))
+                      }
+                    >
+                      {rates.map((value) => (
+                        <option key={value} value={value}>
+                          {value}×
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button onClick={toggleFullscreen}>
+                    {fullscreen ? "Keluar skrin penuh" : "⛶ Skrin penuh"}
+                  </button>
+                </div>
               )}
             </section>
             <div>

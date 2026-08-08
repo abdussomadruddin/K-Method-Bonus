@@ -525,17 +525,27 @@ footer {
   display: flex;
   flex-direction: column;
 }
-.player-frame {
-  position: relative;
+.player-stage {
+  display: flex;
+  flex-direction: column;
   background: #07100d;
 }
-.player-frame:fullscreen {
+.player-stage:fullscreen {
   width: 100vw;
   height: 100vh;
 }
-.player-backdrop .player-frame {
+.player-frame {
+  position: relative;
+  min-height: 0;
+  background: #07100d;
+}
+.player-backdrop .player-stage {
   flex: 1;
   min-height: 0;
+}
+.player-backdrop .player-frame,
+.player-stage:fullscreen .player-frame {
+  flex: 1;
 }
 .youtube-player {
   display: block;
@@ -545,7 +555,7 @@ footer {
   background: #07100d;
 }
 .player-backdrop .youtube-player,
-.player-frame:fullscreen .youtube-player {
+.player-stage:fullscreen .youtube-player {
   height: 100%;
   aspect-ratio: auto;
 }
@@ -578,19 +588,17 @@ footer {
   opacity: 1;
 }
 .lms-player-controls {
-  position: absolute;
-  left: 50%;
-  bottom: 18px;
+  position: relative;
   z-index: 2;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 8px;
-  max-width: calc(100% - 24px);
-  transform: translateX(-50%);
-  padding: 7px;
-  border-radius: 12px;
-  background: rgba(5, 12, 10, 0.78);
+  width: 100%;
+  max-width: none;
+  padding: 10px clamp(12px, 3vw, 32px);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  background: #07100d;
 }
 .lms-player-controls button {
   border: 0;
@@ -766,9 +774,6 @@ footer {
   border-color: rgba(255, 255, 255, 0.3);
   border-top-color: var(--lime);
 }
-.lms-player-controls {
-  width: min(760px, calc(100% - 24px));
-}
 .lms-seek {
   display: grid;
   grid-template-columns: 38px minmax(130px, 1fr) 38px;
@@ -806,9 +811,8 @@ footer {
 }
 @media (max-width: 560px) {
   .lms-player-controls {
-    bottom: 8px;
     gap: 5px;
-    padding: 6px;
+    padding: 8px;
   }
   .lms-player-controls button {
     padding: 8px 9px;

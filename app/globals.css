@@ -859,7 +859,7 @@ footer {
 }
 .group-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 18px;
 }
 .group-card {
@@ -956,6 +956,67 @@ footer {
 }
 .module-group {
   display: block;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.group-summary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+}
+.group-toggle {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0;
+  text-align: left;
+}
+.group-toggle small,
+.group-toggle strong {
+  display: block;
+}
+.group-toggle small {
+  margin-bottom: 5px;
+  color: #3d705f;
+  font: 700 9px var(--font-mono);
+  letter-spacing: 0.14em;
+}
+.group-toggle strong {
+  font-size: 19px;
+}
+.group-count {
+  color: var(--muted);
+  font: 600 11px var(--font-mono);
+  white-space: nowrap;
+}
+.group-summary-actions {
+  display: flex;
+  gap: 8px;
+}
+.group-summary-actions button {
+  border: 0;
+  border-radius: 7px;
+  padding: 8px 10px;
+  background: #edf4f0;
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 750;
+}
+.group-summary-actions button.danger {
+  background: #fff0ef;
+  color: var(--red);
+}
+.module-group .module-list {
+  padding: 18px 20px 20px;
+  border-top: 1px solid var(--line);
 }
 .module-list {
   display: grid;
@@ -1016,4 +1077,13 @@ footer {
   color: var(--green);
   padding: 9px;
   font-weight: 700;
+}
+@media (max-width: 560px) {
+  .group-summary {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .group-summary-actions button {
+    flex: 1;
+  }
 }

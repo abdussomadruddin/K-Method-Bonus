@@ -195,6 +195,8 @@ function GroupManager({
   addModule,
   renameModule,
   removeModule,
+  renameGroup,
+  deleteGroup,
   reorderModules,
   reorderVideos,
   saveVideoOrder,
@@ -207,6 +209,8 @@ function GroupManager({
   addModule: (group: Group) => Promise<void>;
   renameModule: (group: Group, module: GroupModule) => Promise<void>;
   removeModule: (group: Group, module: GroupModule) => Promise<void>;
+  renameGroup: (group: Group) => Promise<void>;
+  deleteGroup: (group: Group) => Promise<void>;
   reorderModules: (
     group: Group,
     id: string,
@@ -227,6 +231,7 @@ function GroupManager({
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
   const [draggedVideo, setDraggedVideo] = useState<{
     id: string;
     groupId: string;
@@ -315,10 +320,38 @@ function GroupManager({
         </div>
         <section className="group-grid">
           {groups.map((group) => (
-            <article className="group-card module-group" key={group.id}>
-              <div>
-                <p className="eyebrow">GROUP AKSES</p>
-                <h2>{group.name}</h2>
+            <article
+              className={`group-card module-group${expandedGroups.includes(group.id) ? " expanded" : ""}`}
+              key={group.id}
+            >
+              <div className="group-summary">
+                <button
+                  className="group-toggle"
+                  onClick={() =>
+                    setExpandedGroups((ids) => flip(ids, group.id))
+                  }
+                  aria-expanded={expandedGroups.includes(group.id)}
+                >
+                  <span>
+                    <small>GROUP AKSES</small>
+                    <strong>{group.name}</strong>
+                  </span>
+                  <span className="group-count">
+                    {group.videoIds.length} video&nbsp;&nbsp;
+                    {expandedGroups.includes(group.id) ? "▴" : "▾"}
+                  </span>
+                </button>
+                <div className="group-summary-actions">
+                  <button onClick={() => renameGroup(group)}>Ubah nama</button>
+                  <button
+                    className="danger"
+                    onClick={() => deleteGroup(group)}
+                  >
+                    Padam group
+                  </button>
+                </div>
+              </div>
+              {expandedGroups.includes(group.id) && (
                 <div className="module-list">
                   {[...group.modules]
                     .sort((a, b) => a.sortOrder - b.sortOrder)
@@ -414,7 +447,7 @@ function GroupManager({
                     ＋ Tambah modul
                   </button>
                 </div>
-              </div>
+              )}
             </article>
           ))}
         </section>
@@ -680,6 +713,22 @@ function Dashboard({
     if (response.ok) await reload();
     setWorking("");
   }
+  async function renameGroup(group: Group) {
+    const name = window.prompt("Nama group", group.name)?.trim();
+    if (!name || name === group.name) return;
+    const response = await fetch(`/api/groups/${group.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    const data = await response.json().catch(() => ({}));
+    setNotice(
+      response.ok
+        ? "Nama group dikemas kini."
+        : data.error || "Nama group tidak dapat dikemas kini.",
+    );
+    if (response.ok) await reload();
+  }
   async function addModule(group: Group) {
     const title = window.prompt("Tajuk modul baharu")?.trim();
     if (!title) return;
@@ -806,6 +855,8 @@ function Dashboard({
         addModule={addModule}
         renameModule={renameModule}
         removeModule={removeModule}
+        renameGroup={renameGroup}
+        deleteGroup={removeGroup}
         reorderModules={reorderModules}
         reorderVideos={reorderVideos}
         saveVideoOrder={saveVideoOrder}

@@ -694,12 +694,18 @@ function Dashboard({
     setWorking("");
   }
   async function removeGroup(group: Group) {
-    if (
-      !window.confirm(
-        `Padam group “${group.name}”? Video YouTube tidak akan dipadam.`,
-      )
-    )
+    const typedName = window.prompt(
+      `PENGESAHAN PADAM GROUP\n\nTaip semula nama group dengan tepat untuk meneruskan:\n${group.name}`,
+    );
+    if (typedName === null) return;
+    if (typedName.trim() !== group.name) {
+      window.alert("Nama group tidak sepadan. Group tidak dipadam.");
       return;
+    }
+    const confirmed = window.confirm(
+      `AMARAN AKHIR\n\nAnda akan memadam group “${group.name}”. Semua akses group dan susunan modulnya akan dipadam. Video asal tidak akan dipadam.\n\nTindakan ini tidak boleh dibatalkan. Tekan OK untuk CONFIRM DELETE.`,
+    );
+    if (!confirmed) return;
     setWorking(group.id);
     const response = await fetch(`/api/groups/${group.id}`, {
       method: "DELETE",

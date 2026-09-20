@@ -527,6 +527,7 @@ function Dashboard({
   const [playing, setPlaying] = useState(true);
   const [muted, setMuted] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
+  const [viewportFullscreen, setViewportFullscreen] = useState(false);
   const [rate, setRate] = useState(1);
   const [current, setCurrent] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -534,6 +535,7 @@ function Dashboard({
   const frameRef = useRef<HTMLElement>(null);
   const currentRef = useRef(0);
   useEffect(() => {
+    setViewportFullscreen(false);
     if (selected) {
       setPlaying(true);
       setMuted(false);
@@ -548,6 +550,19 @@ function Dashboard({
     document.addEventListener("fullscreenchange", change);
     return () => document.removeEventListener("fullscreenchange", change);
   }, []);
+  useEffect(() => {
+    if (!viewportFullscreen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setViewportFullscreen(false);
+    };
+    window.addEventListener("keydown", escape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", escape);
+    };
+  }, [viewportFullscreen]);
   useEffect(() => {
     const receive = (event: MessageEvent) => {
       if (event.source !== playerRef.current?.contentWindow) return;
@@ -600,8 +615,24 @@ function Dashboard({
     setMuted((value) => !value);
   }
   async function toggleFullscreen() {
-    if (document.fullscreenElement) await document.exitFullscreen();
-    else await frameRef.current?.requestFullscreen();
+    if (viewportFullscreen) {
+      setViewportFullscreen(false);
+      return;
+    }
+    if (document.fullscreenElement) {
+      try { await document.exitFullscreen(); } catch { /* Keep the exit control available. */ }
+      return;
+    }
+    const frame = frameRef.current;
+    if (!frame) return;
+    // iPhone browsers may not expose fullscreen for arbitrary HTML elements.
+    if (typeof frame.requestFullscreen === "function") {
+      try {
+        await frame.requestFullscreen();
+        return;
+      } catch { /* Fall back when the browser denies native fullscreen. */ }
+    }
+    setViewportFullscreen(true);
   }
   function changeRate(value: number) {
     setRate(value);
@@ -1229,7 +1260,7 @@ function Dashboard({
             </button>
             <section
               ref={frameRef}
-              className={`player-stage${!admin ? " student-player" : ""}`}
+              className={`player-stage${!admin ? " student-player" : ""}${viewportFullscreen ? " viewport-fullscreen" : ""}`}
             >
               <section className="player-frame">
                 <iframe
@@ -1286,8 +1317,8 @@ function Dashboard({
                       ))}
                     </select>
                   </label>
-                  <button onClick={toggleFullscreen}>
-                    {fullscreen ? "Keluar skrin penuh" : "⛶ Skrin penuh"}
+                  <button onClick={toggleFullscreen} aria-pressed={fullscreen || viewportFullscreen}>
+                    {fullscreen || viewportFullscreen ? "Keluar skrin penuh" : "⛶ Skrin penuh"}
                   </button>
                 </div>
               )}

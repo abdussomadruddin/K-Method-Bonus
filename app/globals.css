@@ -530,6 +530,23 @@ footer {
   flex-direction: column;
   background: #07100d;
 }
+.player-stage.viewport-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  width: 100%;
+  height: 100dvh;
+  padding-top: env(safe-area-inset-top);
+  box-sizing: border-box;
+}
+.player-stage.viewport-fullscreen .player-frame {
+  flex: 1;
+  min-height: 0;
+}
+.player-stage.viewport-fullscreen .youtube-player {
+  height: 100%;
+  aspect-ratio: auto;
+}
 .player-stage:fullscreen {
   width: 100vw;
   height: 100vh;

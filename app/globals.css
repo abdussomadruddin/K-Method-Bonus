@@ -588,21 +588,9 @@ footer {
   background: transparent;
   color: #fff;
 }
-.player-surface span {
-  display: grid;
-  place-items: center;
-  width: 64px;
-  height: 64px;
-  margin: auto;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.55);
-  font-size: 24px;
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-.player-surface:hover span,
-.player-surface:focus-visible span {
-  opacity: 1;
+.player-surface:focus-visible {
+  outline: 2px solid #d9fa99;
+  outline-offset: -3px;
 }
 .lms-player-controls {
   position: relative;
@@ -1376,5 +1364,41 @@ footer {
   .empty {
     padding: 56px 18px;
     border-radius: 18px;
+  }
+}
+
+/* Keep portrait playback and its controls together, without stretching the iframe. */
+@media (max-width: 900px) and (orientation: portrait) {
+  .player-backdrop .student-player,
+  .student-player:fullscreen,
+  .student-player.viewport-fullscreen {
+    justify-content: center;
+    overflow-y: auto;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .player-backdrop .student-player .player-frame,
+  .student-player:fullscreen .player-frame,
+  .student-player.viewport-fullscreen .player-frame {
+    flex: 0 0 auto;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+  }
+  .student-player .lms-player-controls {
+    flex: 0 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 14px 16px 18px;
+    background: #10201b;
+  }
+  .student-player .lms-seek {
+    grid-column: 1 / -1;
+    margin-bottom: 4px;
+  }
+  .student-player .lms-player-controls button,
+  .student-player .lms-speed {
+    min-height: 44px;
+    border-radius: 12px;
+    font-size: 13px;
   }
 }

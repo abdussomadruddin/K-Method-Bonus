@@ -1278,9 +1278,11 @@ function Dashboard({
                   onLoad={connect}
                 />
                 {!admin && (
-                  <button className="player-surface" onClick={togglePlay}>
-                    <span>{playing ? "❚❚" : "▶"}</span>
-                  </button>
+                  <button
+                    className="player-surface"
+                    onClick={togglePlay}
+                    aria-label={playing ? "Jeda video" : "Main video"}
+                  />
                 )}
               </section>
               {!admin && (

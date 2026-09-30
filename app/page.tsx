@@ -40,6 +40,17 @@ type Group = {
   modules: GroupModule[];
 };
 const rates = [1, 1.25, 1.5, 1.75, 2];
+function Icon({ name }: { name: "play" | "pause" | "sound" | "mute" | "expand" | "chevron" }) {
+  const paths = {
+    play: "M9 5l11 7-11 7V5Z",
+    pause: "M8 5v14M16 5v14",
+    sound: "M11 5 6 9H3v6h3l5 4V5ZM15 8a6 6 0 0 1 0 8M18 5a10 10 0 0 1 0 14",
+    mute: "M11 5 6 9H3v6h3l5 4V5ZM16 9l5 6M21 9l-5 6",
+    expand: "M8 3H3v5M16 3h5v5M21 16v5h-5M3 16v5h5",
+    chevron: "m6 9 6 6 6-6",
+  };
+  return <svg className="app-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[name]} /></svg>;
+}
 function time(value: number) {
   const s = Math.max(0, Math.floor(Number.isFinite(value) ? value : 0));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -525,8 +536,10 @@ function Dashboard({
   const [groupVideoIds, setGroupVideoIds] = useState<string[]>([]);
   const [revealed, setRevealed] = useState<string[]>([]);
   const [playing, setPlaying] = useState(true);
+  const [buffering, setBuffering] = useState(false);
   const [muted, setMuted] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
+  const [collapsedModules, setCollapsedModules] = useState<string[]>([]);
   const [viewportFullscreen, setViewportFullscreen] = useState(false);
   const [rate, setRate] = useState(1);
   const [current, setCurrent] = useState(0);
@@ -536,6 +549,7 @@ function Dashboard({
   const currentRef = useRef(0);
   useEffect(() => {
     setViewportFullscreen(false);
+    setBuffering(Boolean(selected));
     if (selected) {
       setPlaying(true);
       setMuted(false);
@@ -570,6 +584,10 @@ function Dashboard({
         const data =
           typeof event.data === "string" ? JSON.parse(event.data) : event.data;
         if (data.event === "infoDelivery" && data.info) {
+          if (typeof data.info.playerState === "number") {
+            setBuffering(data.info.playerState === 3);
+            setPlaying(data.info.playerState === 1 || data.info.playerState === 3);
+          }
           if (typeof data.info.currentTime === "number") {
             currentRef.current = data.info.currentTime;
             setCurrent(data.info.currentTime);
@@ -1133,10 +1151,16 @@ function Dashboard({
                         videos[index - 1].module?.id !== video.module?.id) && (
                         <header className="module-title">
                           <p>MODUL</p>
-                          <h2>{video.module?.title || "Video"}</h2>
+                          <button className="module-toggle" aria-expanded={!collapsedModules.includes(video.module?.id || "ungrouped")} onClick={() => {
+                            const id = video.module?.id || "ungrouped";
+                            setCollapsedModules((values) => values.includes(id) ? values.filter((value) => value !== id) : [...values, id]);
+                          }}>
+                            <span><h2>{video.module?.title || "Video"}</h2><small>{videos.filter((item) => item.module?.id === video.module?.id).length} video</small></span>
+                            <Icon name="chevron" />
+                          </button>
                         </header>
                       )}
-                    <article className="video-card">
+                    <article className="video-card" hidden={!admin && collapsedModules.includes(video.module?.id || "ungrouped")}>
                       <button
                         className="thumbnail"
                         onClick={() => setSelected(video)}
@@ -1154,7 +1178,7 @@ function Dashboard({
                         <span className="number">
                           {String(index + 1).padStart(2, "0")}
                         </span>
-                        <span className="play">▶</span>
+                        <span className="play"><Icon name="play" /></span>
                         <span className="duration">VIDEO</span>
                       </button>
                       <div className="card-body">
@@ -1287,6 +1311,7 @@ function Dashboard({
               </section>
               {!admin && (
                 <div className="lms-player-controls">
+                  {buffering && <div className="player-loading" role="status"><span />Memuatkan video…</div>}
                   <div className="lms-seek">
                     <span>{time(current)}</span>
                     <input
@@ -1299,10 +1324,10 @@ function Dashboard({
                     <span>{time(duration)}</span>
                   </div>
                   <button onClick={togglePlay}>
-                    {playing ? "❚❚ Jeda" : "▶ Main"}
+                    <Icon name={playing ? "pause" : "play"} />{playing ? "Jeda" : "Main"}
                   </button>
                   <button onClick={toggleMute}>
-                    {muted ? "🔇 Hidupkan suara" : "🔊 Senyapkan"}
+                    <Icon name={muted ? "mute" : "sound"} />{muted ? "Buka suara" : "Senyapkan"}
                   </button>
                   <label className="lms-speed">
                     Kelajuan{" "}
@@ -1320,7 +1345,7 @@ function Dashboard({
                     </select>
                   </label>
                   <button onClick={toggleFullscreen} aria-pressed={fullscreen || viewportFullscreen}>
-                    {fullscreen || viewportFullscreen ? "Keluar skrin penuh" : "⛶ Skrin penuh"}
+                    <Icon name="expand" />{fullscreen || viewportFullscreen ? "Kecilkan" : "Skrin penuh"}
                   </button>
                 </div>
               )}

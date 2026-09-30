@@ -1367,6 +1367,37 @@ footer {
   }
 }
 
+.app-icon { width: 22px; height: 22px; flex-shrink: 0; }
+.player-loading { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; grid-column: 1 / -1; color: #d9fa99; font-size: 12px; }
+.player-loading span { width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: loading-spin .8s linear infinite; }
+@keyframes loading-spin { to { transform: rotate(360deg); } }
+.video-card[hidden] { display: none; }
+.module-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 12px 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.module-toggle h2 { margin: 0; }
+.module-toggle small { display: block; margin-top: 5px; opacity: .65; }
+.module-toggle .app-icon { transition: transform .2s ease; }
+.module-toggle[aria-expanded="false"] .app-icon { transform: rotate(-90deg); }
+.lms-player-controls button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: transform .15s ease, background .15s ease; }
+.lms-player-controls button:active { transform: scale(.96); }
+.video-card { transition: transform .2s ease, box-shadow .2s ease; animation: card-appear .22s ease both; }
+.thumbnail:active { transform: scale(.985); }
+.thumbnail { transition: transform .18s ease; }
+.thumbnail img { background: #183d32; }
+.play .app-icon { width: 26px; height: 26px; }
+@keyframes card-appear { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 640px) {
+  .video-card { border-radius: 20px; box-shadow: 0 6px 24px rgba(10, 35, 25, .05); }
+  .card-body h2 { font-size: 17px; line-height: 1.45; }
+  .module-title { padding-top: 12px; }
+  .module-toggle { min-height: 60px; }
+  .module-toggle h2 { font-size: 20px; line-height: 1.3; }
+  .lms-player-controls button { font-size: 13px; }
+  .lms-player-controls button:first-of-type { background: #d9fa99; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .video-card, .thumbnail, .module-toggle .app-icon, .lms-player-controls button { animation: none; transition: none; }
+}
+
 /* Keep portrait playback and its controls together, without stretching the iframe. */
 @media (max-width: 900px) and (orientation: portrait) {
   .player-backdrop .student-player,
